@@ -82,7 +82,7 @@ export default function Home() {
         </a>
 
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Main navigation">
-          <a href="#swap" onClick={() => setMenuOpen(false)}>Swap</a>
+          <a href="/swap" onClick={() => setMenuOpen(false)}>Swap</a>
           <a href="#why" onClick={() => setMenuOpen(false)}>Why Dubu</a>
           <a href="#routing" onClick={() => setMenuOpen(false)}>Routing</a>
           <a href="#analytics" onClick={() => setMenuOpen(false)}>Analytics</a>
@@ -98,7 +98,7 @@ export default function Home() {
           >
             {isDark ? "☀" : "◔"}
           </button>
-          <a className="button button-small button-primary" href="#swap">
+          <a className="button button-small button-primary" href="/swap">
             Launch app <span>↗</span>
           </a>
           <button
@@ -127,8 +127,8 @@ export default function Home() {
             exchanges—so you keep more of every trade.
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#swap">Launch app <span>↗</span></a>
-            <a className="button button-secondary" href="#analytics">Explore analytics</a>
+            <a className="button button-primary" href="/swap">Launch app <span>↗</span></a>
+            <a className="button button-secondary" href="/analytics">Explore analytics</a>
           </div>
           <div className="social-proof">
             <div className="avatar-stack" aria-hidden="true">
@@ -339,7 +339,7 @@ export default function Home() {
         <h2>One swap is all<br />it <em>takes.</em></h2>
         <p>Trade across DeFi with better pricing, lower friction, and total control.</p>
         <div className="hero-actions">
-          <a className="button button-primary" href="#swap">Launch app <span>↗</span></a>
+          <a className="button button-primary" href="/swap">Launch app <span>↗</span></a>
           <a className="button button-secondary" href="#routing">See how routing works</a>
         </div>
       </section>
@@ -350,8 +350,8 @@ export default function Home() {
         </a>
         <p>One swap. Best price. Every time.</p>
         <div className="footer-links">
-          <a href="#swap">App</a>
-          <a href="#analytics">Analytics</a>
+          <a href="/swap">App</a>
+          <a href="/analytics">Analytics</a>
           <a href="#about">Docs</a>
           <a href="#about">X / Twitter</a>
         </div>
