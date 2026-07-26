@@ -18,13 +18,13 @@
 
 html {
   scroll-behavior: smooth;
-  background: #e9e5de;
+  background: #f8f5ef;
 }
 
 body {
   margin: 0;
   color: var(--ink);
-  background: #e9e5de;
+  background: #f8f5ef;
   font-family: var(--font-geist), Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -57,15 +57,13 @@ button {
   --surface: rgba(255, 253, 248, 0.76);
   --soft-surface: rgba(231, 224, 213, 0.33);
   position: relative;
-  width: min(1600px, calc(100% - 28px));
-  margin: 14px auto;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
   overflow: hidden;
   background:
     radial-gradient(circle at 67% 14%, rgba(220, 203, 177, 0.27), transparent 27%),
     linear-gradient(180deg, #fbf9f5 0%, #f7f3ed 54%, #f2ece3 100%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 28px;
-  box-shadow: 0 8px 34px rgba(55, 42, 29, 0.11);
   transition: background 300ms ease, color 300ms ease;
 }
 
@@ -1188,9 +1186,8 @@ footer small {
 
 @media (max-width: 900px) {
   .site {
-    width: calc(100% - 16px);
-    margin: 8px auto;
-    border-radius: 22px;
+    width: 100%;
+    margin: 0;
   }
 
   .nav-wrap {
