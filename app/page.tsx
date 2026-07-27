@@ -79,8 +79,7 @@ export default function Home() {
           <a href="/swap" onClick={() => setMenuOpen(false)}>Swap</a>
           <a href="#why" onClick={() => setMenuOpen(false)}>Why Dubu</a>
           <a href="#routing" onClick={() => setMenuOpen(false)}>Routing</a>
-          <a href="#analytics" onClick={() => setMenuOpen(false)}>Analytics</a>
-          <a href="#about" onClick={() => setMenuOpen(false)}>About</a>
+          <a href="/docs" onClick={() => setMenuOpen(false)}>Docs</a>
         </nav>
 
         <div className="nav-actions">
@@ -341,7 +340,7 @@ export default function Home() {
         <div className="footer-links">
           <a href="/swap">App</a>
           <a href="/analytics">Analytics</a>
-          <a href="#about">Docs</a>
+          <a href="/docs">Docs</a>
           <a href="#about">X / Twitter</a>
         </div>
         <small>© 2026 Dubu Labs. Non-custodial by design.</small>
