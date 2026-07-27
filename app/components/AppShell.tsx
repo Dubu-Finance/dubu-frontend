@@ -75,9 +75,8 @@ export function useAppWallet() {
 
 const navItems = [
   { href: "/swap", label: "Swap", icon: "⇄" },
-  { href: "/pools", label: "Pools", icon: "◇" },
+  { href: "/trade", label: "Trade", icon: "⌁" },
   { href: "/portfolio", label: "Portfolio", icon: "⬡" },
-  { href: "/analytics", label: "Analytics", icon: "▥" },
   { href: "/settings", label: "Settings", icon: "⚙" },
 ];
 

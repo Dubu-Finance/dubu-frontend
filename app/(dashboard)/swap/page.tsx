@@ -82,7 +82,7 @@ export default function SwapPage() {
       impact,
       minimum,
       slippage,
-      execution: "Dubu AMM",
+      execution: "Dubu routing",
       networkCost: usdValue > 25_000 ? 11.42 : 6.18,
       rate: tokens[fromToken].price / tokens[toToken].price,
     };
@@ -344,7 +344,7 @@ export default function SwapPage() {
             <button className="app-modal-close" type="button" aria-label="Close approval" onClick={() => setApprovalOpen(false)}>×</button>
             <TokenIcon symbol={fromToken} />
             <h2 id="approval-title">Approve {fromToken}</h2>
-            <p>Allow the Dubu AMM contract to use your {fromToken} for this trade. This is required once per token.</p>
+            <p>Allow the Dubu router contract to use your {fromToken} for this trade. This is required once per token.</p>
             <button className="app-primary-button" type="button" onClick={approveToken}>Approve in wallet</button>
             <button className="app-quiet-button" type="button" onClick={() => setApprovalOpen(false)}>Cancel</button>
           </div>

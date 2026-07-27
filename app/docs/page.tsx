@@ -24,11 +24,11 @@ const docGroups = [
     ],
   },
   {
-    title: "Liquidity",
+    title: "Portfolio",
     items: [
-      ["Pool basics", "next-steps"],
-      ["Add liquidity", "next-steps"],
-      ["Manage positions", "next-steps"],
+      ["Wallet overview", "next-steps"],
+      ["Asset balances", "next-steps"],
+      ["Activity history", "next-steps"],
     ],
   },
   {
@@ -74,7 +74,7 @@ export default function DocsPage() {
 
   function copyExample() {
     void navigator.clipboard.writeText(`const quote = await dubu.quote({
-  chainId: 1,
+  chainId: 91342,
   sellToken: "ETH",
   buyToken: "USDC",
   sellAmount: "1000000000000000000"
@@ -93,7 +93,7 @@ export default function DocsPage() {
         <nav className={menuOpen ? "docs-top-nav open" : "docs-top-nav"} aria-label="Primary navigation">
           <Link href="/swap" onClick={() => setMenuOpen(false)}>Swap</Link>
           <Link href="/#why" onClick={() => setMenuOpen(false)}>Why Dubu</Link>
-          <Link href="/#routing" onClick={() => setMenuOpen(false)}>AMM</Link>
+          <Link href="/#routing" onClick={() => setMenuOpen(false)}>Routing</Link>
           <Link className="active" href="/docs" onClick={() => setMenuOpen(false)}>Docs</Link>
         </nav>
 
@@ -176,7 +176,7 @@ export default function DocsPage() {
           <section className="docs-hero" id="overview">
             <div className="docs-eyebrow">GETTING STARTED</div>
             <h1>Meet Dubu.</h1>
-            <p>A calm, non-custodial interface for trading and managing liquidity across decentralized markets.</p>
+            <p>A calm, non-custodial interface for aggregated trading and wallet portfolio tracking.</p>
             <div className="docs-meta">
               <span>Last updated Jul 27, 2026</span>
               <span>·</span>
@@ -187,8 +187,8 @@ export default function DocsPage() {
           <section className="docs-section" id="what-is-dubu">
             <h2>What is Dubu?</h2>
             <p>
-              Dubu is a decentralized exchange interface designed to make onchain execution easier to understand.
-              It brings quotes, transaction settings, pool discovery, and portfolio views into a single product.
+              Dubu is a decentralized exchange aggregator interface designed to make onchain execution easier to understand.
+              It brings quotes, advanced orders, market charts, and portfolio views into a single product.
             </p>
             <p>
               Trades remain non-custodial. Your wallet signs every approval and transaction, while Dubu presents
@@ -266,7 +266,7 @@ export default function DocsPage() {
                 <button type="button" onClick={copyExample}>{copied ? "Copied ✓" : "Copy"}</button>
               </div>
               <pre><code><span className="code-purple">const</span> quote = <span className="code-purple">await</span> dubu.quote({`{\n`}
-  chainId: <span className="code-gold">1</span>,{`\n`}
+  chainId: <span className="code-gold">91342</span>,{`\n`}
   sellToken: <span className="code-green">&quot;ETH&quot;</span>,{`\n`}
   buyToken: <span className="code-green">&quot;USDC&quot;</span>,{`\n`}
   sellAmount: <span className="code-green">&quot;1000000000000000000&quot;</span>{`\n`}
@@ -278,7 +278,7 @@ export default function DocsPage() {
             <h2>Next steps</h2>
             <div className="docs-next-grid">
               <Link href="/swap"><span>⇄</span><div><strong>Make a swap</strong><p>Open the trading interface.</p></div><b>→</b></Link>
-              <Link href="/pools"><span>◇</span><div><strong>Explore pools</strong><p>Learn about liquidity positions.</p></div><b>→</b></Link>
+              <Link href="/trade"><span>⌁</span><div><strong>Open advanced trade</strong><p>Use charts and advanced order controls.</p></div><b>→</b></Link>
             </div>
           </section>
 

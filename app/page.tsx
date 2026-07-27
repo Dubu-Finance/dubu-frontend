@@ -15,8 +15,8 @@ const features = [
   },
   {
     icon: "◇",
-    title: "Purpose-built liquidity",
-    body: "A proprietary AMM designed around efficient execution on GIWA Chain.",
+    title: "Aggregated execution",
+    body: "Dubu compares executable quotes to surface a stronger price for each trade.",
   },
   {
     icon: "⌁",
@@ -78,7 +78,7 @@ export default function Home() {
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Main navigation">
           <a href="/swap" onClick={() => setMenuOpen(false)}>Swap</a>
           <a href="#why" onClick={() => setMenuOpen(false)}>Why Dubu</a>
-          <a href="#routing" onClick={() => setMenuOpen(false)}>AMM</a>
+          <a href="#routing" onClick={() => setMenuOpen(false)}>Routing</a>
           <a href="/docs" onClick={() => setMenuOpen(false)}>Docs</a>
         </nav>
 
@@ -116,11 +116,11 @@ export default function Home() {
           </h1>
           <div className="hero-actions">
             <a className="button button-primary" href="/swap">Launch app <span>↗</span></a>
-            <a className="button button-secondary" href="/analytics">Explore analytics</a>
+            <a className="button button-secondary" href="/trade">Open advanced trade</a>
           </div>
           <div className="social-proof product-proof">
             <span aria-hidden="true" />
-            <p>Purpose-built liquidity for <strong>GIWA Chain</strong></p>
+            <p>Focused execution for <strong>GIWA Chain</strong></p>
           </div>
         </div>
 
@@ -236,7 +236,7 @@ export default function Home() {
         <div className="section-heading">
           <div className="eyebrow"><span>02</span> Why Dubu</div>
           <h2>Smarter swaps.<br /><em>Designed for clarity.</em></h2>
-          <p>Dubu turns proprietary liquidity and pricing into one calm, precise trading experience.</p>
+          <p>Dubu brings quote comparison, execution details, and wallet control into one calm trading experience.</p>
         </div>
         <div className="feature-grid">
           {features.map((feature, index) => (
@@ -252,15 +252,15 @@ export default function Home() {
 
       <section className="section routing-section" id="routing">
         <div className="routing-copy">
-          <div className="eyebrow"><span>03</span> Purpose-built liquidity</div>
-          <h2>An AMM tuned for<br /><em>better execution.</em></h2>
+          <div className="eyebrow"><span>03</span> Aggregated execution</div>
+          <h2>One interface for<br /><em>better execution.</em></h2>
           <p>
-            Dubu uses proprietary pricing and liquidity logic designed for
-            efficient onchain trading on GIWA Chain.
+            Dubu evaluates available execution paths and presents the quote details
+            that matter before you trade on GIWA Chain.
           </p>
           <ul>
             <li><span>✓</span> Quotes respond to trade size</li>
-            <li><span>✓</span> Liquidity managed for execution</li>
+            <li><span>✓</span> Routes compared for execution</li>
             <li><span>✓</span> Clear before you confirm</li>
           </ul>
         </div>
