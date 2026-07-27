@@ -347,6 +347,23 @@ h2 em {
   font-weight: 600;
 }
 
+.product-proof {
+  gap: 12px;
+}
+
+.product-proof > span {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #c29b6b;
+  box-shadow: 0 0 0 6px rgba(194, 155, 107, 0.12);
+}
+
+.hero-copy > h1 + .hero-actions {
+  margin-top: 0;
+}
+
 .avatar-stack {
   display: flex;
   padding-left: 8px;

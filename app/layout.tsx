@@ -16,30 +16,30 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase: base,
-    title: "Dubu — One Swap. Best Price. Every Time.",
+    title: "Dubu — Best Price. Every Time.",
     description:
-      "Dubu finds the most efficient swap route across decentralized exchanges so you keep more of every trade.",
+      "A proprietary AMM for clear, non-custodial swaps on GIWA Chain.",
     icons: {
       icon: "/assets/character.png",
       shortcut: "/assets/character.png",
     },
     openGraph: {
-      title: "Dubu — One Swap. Best Price. Every Time.",
-      description: "Smarter routing across DeFi. Better price, less friction, total control.",
+      title: "Dubu — Best Price. Every Time.",
+      description: "Clear pricing, low friction, and full wallet control on GIWA Chain.",
       type: "website",
       images: [
         {
           url: "/og.png",
           width: 1536,
           height: 864,
-          alt: "Dubu — One Swap. Best Price. Every Time.",
+          alt: "Dubu — Best Price. Every Time.",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Dubu — One Swap. Best Price. Every Time.",
-      description: "Smarter routing across DeFi. Better price, less friction, total control.",
+      title: "Dubu — Best Price. Every Time.",
+      description: "Clear pricing, low friction, and full wallet control on GIWA Chain.",
       images: ["/og.png"],
     },
   };

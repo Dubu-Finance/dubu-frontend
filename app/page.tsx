@@ -5,18 +5,18 @@ import { useMemo, useState } from "react";
 const features = [
   {
     icon: "✦",
-    title: "Best price, every time",
-    body: "Dubu compares prices across leading DEXs and builds the most efficient route in seconds.",
+    title: "Responsive pricing",
+    body: "Quotes adapt to trade size, available liquidity, and current market conditions.",
   },
   {
     icon: "↘",
     title: "More stays in your wallet",
-    body: "Lower slippage, smarter gas estimates, and fewer hidden costs on every trade.",
+    body: "Clear price impact, minimum received, and network cost before every trade.",
   },
   {
     icon: "◇",
-    title: "One trade. Many pools.",
-    body: "Access deep liquidity across chains without managing multiple tabs or interfaces.",
+    title: "Purpose-built liquidity",
+    body: "A proprietary AMM designed around efficient execution on GIWA Chain.",
   },
   {
     icon: "⌁",
@@ -26,16 +26,16 @@ const features = [
 ];
 
 const stats = [
-  ["$2.41B+", "Total volume aggregated"],
-  ["1.2M+", "Swaps executed"],
-  ["12,542+", "Active traders"],
-  ["6+", "DEXs integrated"],
+  ["1 sec", "GIWA block time"],
+  ["EVM", "Compatible"],
+  ["ETH", "Gas token"],
+  ["100%", "Non-custodial"],
 ];
 
 const routes = [
-  { name: "1inch", width: "72%", tone: "gold" },
-  { name: "Curve", width: "54%", tone: "blue" },
-  { name: "Uniswap", width: "39%", tone: "pink" },
+  { name: "Market price", width: "72%", tone: "gold" },
+  { name: "Inventory", width: "54%", tone: "blue" },
+  { name: "Trade size", width: "39%", tone: "pink" },
 ];
 
 export default function Home() {
@@ -78,7 +78,7 @@ export default function Home() {
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Main navigation">
           <a href="/swap" onClick={() => setMenuOpen(false)}>Swap</a>
           <a href="#why" onClick={() => setMenuOpen(false)}>Why Dubu</a>
-          <a href="#routing" onClick={() => setMenuOpen(false)}>Routing</a>
+          <a href="#routing" onClick={() => setMenuOpen(false)}>AMM</a>
           <a href="/docs" onClick={() => setMenuOpen(false)}>Docs</a>
         </nav>
 
@@ -111,23 +111,16 @@ export default function Home() {
         <div className="hero-copy">
           <div className="eyebrow"><span>✦</span> The smartest way to trade</div>
           <h1>
-            One swap.<br />
             Best price.<br />
             <em>Every time.</em>
           </h1>
-          <p className="hero-lede">
-            Dubu finds the most efficient swap route across decentralized
-            exchanges—so you keep more of every trade.
-          </p>
           <div className="hero-actions">
             <a className="button button-primary" href="/swap">Launch app <span>↗</span></a>
             <a className="button button-secondary" href="/analytics">Explore analytics</a>
           </div>
-          <div className="social-proof">
-            <div className="avatar-stack" aria-hidden="true">
-              <span>SK</span><span>JL</span><span>AR</span><span>MH</span>
-            </div>
-            <p>Loved by <strong>12,542+</strong> traders</p>
+          <div className="social-proof product-proof">
+            <span aria-hidden="true" />
+            <p>Purpose-built liquidity for <strong>GIWA Chain</strong></p>
           </div>
         </div>
 
@@ -227,23 +220,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="trust-band" aria-label="Integrated exchanges">
-        <p>Trusted by traders. Built on decentralization.</p>
-        <div className="wordmarks" aria-label="1inch, Uniswap, Curve, Balancer, Kyber and PancakeSwap">
-          <span>◒ 1inch</span>
-          <span>♞ UNISWAP</span>
-          <span>◐ Curve</span>
-          <span>≋ BALANCER</span>
-          <span>◈ kyber</span>
-          <span>♙ PancakeSwap</span>
+      <section className="trust-band" aria-label="Dubu and GIWA Chain characteristics">
+        <p>Designed for GIWA Chain. Built with Ethereum familiarity.</p>
+        <div className="wordmarks" aria-label="Dubu and GIWA Chain product characteristics">
+          <span>GIWA CHAIN</span>
+          <span>ETHEREUM L2</span>
+          <span>OP STACK</span>
+          <span>EVM COMPATIBLE</span>
+          <span>ETH GAS</span>
+          <span>NON-CUSTODIAL</span>
         </div>
       </section>
 
       <section className="section features-section" id="why">
         <div className="section-heading">
           <div className="eyebrow"><span>02</span> Why Dubu</div>
-          <h2>Smarter swaps.<br /><em>Powered by DeFi.</em></h2>
-          <p>Dubu brings fragmented liquidity together in one calm, precise trading experience.</p>
+          <h2>Smarter swaps.<br /><em>Designed for clarity.</em></h2>
+          <p>Dubu turns proprietary liquidity and pricing into one calm, precise trading experience.</p>
         </div>
         <div className="feature-grid">
           {features.map((feature, index) => (
@@ -259,21 +252,20 @@ export default function Home() {
 
       <section className="section routing-section" id="routing">
         <div className="routing-copy">
-          <div className="eyebrow"><span>03</span> Intelligent routing</div>
-          <h2>Liquidity, stitched<br />together <em>beautifully.</em></h2>
+          <div className="eyebrow"><span>03</span> Purpose-built liquidity</div>
+          <h2>An AMM tuned for<br /><em>better execution.</em></h2>
           <p>
-            One order can travel through multiple pools. Dubu evaluates price,
-            depth, slippage, and gas together—then selects the route with the
-            strongest net outcome.
+            Dubu uses proprietary pricing and liquidity logic designed for
+            efficient onchain trading on GIWA Chain.
           </p>
           <ul>
-            <li><span>✓</span> Quote and gas optimized together</li>
-            <li><span>✓</span> Protected from inefficient routes</li>
-            <li><span>✓</span> Transparent before you confirm</li>
+            <li><span>✓</span> Quotes respond to trade size</li>
+            <li><span>✓</span> Liquidity managed for execution</li>
+            <li><span>✓</span> Clear before you confirm</li>
           </ul>
         </div>
 
-        <div className="routing-visual" aria-label="Example of a smart swap route">
+        <div className="routing-visual" aria-label="Example of Dubu swap pricing">
           <div className="route-orbit orbit-one" />
           <div className="route-orbit orbit-two" />
           <div className="route-token route-origin">
@@ -292,15 +284,15 @@ export default function Home() {
             <img src="/assets/asset_05.png" alt="" />
             <span>2,543.71 USDC</span>
           </div>
-          <div className="route-saving"><span>Net improvement</span><strong>+$24.68</strong></div>
+          <div className="route-saving"><span>Quote status</span><strong>Ready</strong></div>
           <img className="route-mascot" src="/assets/character.png" alt="Dubu mascot" />
         </div>
       </section>
 
       <section className="stats-wrap" id="analytics">
         <div className="stats-heading">
-          <span>Live network pulse</span>
-          <p>Aggregated across every Dubu route</p>
+          <span>Built for familiar execution</span>
+          <p>GIWA performance with Ethereum-compatible tooling</p>
         </div>
         <div className="stats-grid">
           {stats.map(([value, label]) => (
@@ -315,8 +307,8 @@ export default function Home() {
       <section className="quote-section" id="about">
         <img src="/assets/character.png" alt="" />
         <blockquote>
-          “A good swap should feel quiet. No hunting across tabs, no second-guessing
-          the route—just the best available price, clearly explained.”
+          “A good swap should feel quiet. Clear inputs, transparent execution,
+          and full control from your wallet.”
         </blockquote>
         <p>Built for traders who value every basis point.</p>
       </section>
@@ -325,10 +317,10 @@ export default function Home() {
         <div className="cta-glow" />
         <div className="eyebrow"><span>✦</span> Your next trade, simplified</div>
         <h2>One swap is all<br />it <em>takes.</em></h2>
-        <p>Trade across DeFi with better pricing, lower friction, and total control.</p>
+        <p>Trade on GIWA with clear pricing, low friction, and full wallet control.</p>
         <div className="hero-actions">
           <a className="button button-primary" href="/swap">Launch app <span>↗</span></a>
-          <a className="button button-secondary" href="#routing">See how routing works</a>
+          <a className="button button-secondary" href="#routing">See how Dubu works</a>
         </div>
       </section>
 
@@ -336,7 +328,7 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="Dubu home">
           <img src="/assets/Logo.png" alt="Dubu" />
         </a>
-        <p>One swap. Best price. Every time.</p>
+        <p>Best price. Every time.</p>
         <div className="footer-links">
           <a href="/swap">App</a>
           <a href="/analytics">Analytics</a>

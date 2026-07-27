@@ -85,14 +85,14 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel className="settings-panel">
-            <SectionTitle><span className="settings-title-icon">⌁</span> Routing</SectionTitle>
-            <SettingRow label="Multi-hop routing" description="Allow the router to use intermediary tokens when it improves execution.">
-              <Toggle checked={toggles.multihop} onChange={(value) => updateToggle("multihop", value)} label="Multi-hop routing" />
+            <SectionTitle><span className="settings-title-icon">⌁</span> Execution</SectionTitle>
+            <SettingRow label="Price protection" description="Reject the swap when execution moves outside your selected tolerance.">
+              <Toggle checked={toggles.multihop} onChange={(value) => updateToggle("multihop", value)} label="Price protection" />
             </SettingRow>
             <SettingRow label="Private transactions" description="Submit supported swaps through a private RPC to reduce MEV exposure.">
               <Toggle checked={toggles.privateTx} onChange={(value) => updateToggle("privateTx", value)} label="Private transactions" />
             </SettingRow>
-            <SettingRow label="Routing preference" description="Optimize quotes for received amount after network cost.">
+            <SettingRow label="Quote preference" description="Optimize quotes for received amount after network cost.">
               <button className="settings-select" type="button">Best net output <b>⌄</b></button>
             </SettingRow>
           </Panel>

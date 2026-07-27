@@ -232,7 +232,7 @@ export default function DocsPage() {
             <ol className="docs-steps">
               <li><span>1</span><div><strong>Select tokens</strong><p>Choose the asset to pay and the asset to receive.</p></div></li>
               <li><span>2</span><div><strong>Request a quote</strong><p>Enter an amount. The interface calculates an estimated output and execution cost.</p></div></li>
-              <li><span>3</span><div><strong>Review details</strong><p>Check price impact, slippage, minimum received, and order routing.</p></div></li>
+              <li><span>3</span><div><strong>Review details</strong><p>Check price impact, slippage, minimum received, and execution source.</p></div></li>
               <li><span>4</span><div><strong>Confirm in wallet</strong><p>Approve the token when required, then sign the final transaction.</p></div></li>
             </ol>
           </section>

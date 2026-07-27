@@ -76,22 +76,13 @@ export default function SwapPage() {
     const output = (usdValue / tokens[toToken].price) * (1 - impact / 100 - protocolFee);
     const slippage = mode === "TWAP" ? 0.3 : 0.5;
     const minimum = output * (1 - slippage / 100);
-    const stablePair = ["USDC", "USDT", "DAI"].includes(fromToken) && ["USDC", "USDT", "DAI"].includes(toToken);
-    const route = stablePair
-      ? "Curve"
-      : usdValue > 25_000
-        ? "Uniswap V3 64% · Curve 36%"
-        : fromToken === "WBTC" || toToken === "WBTC"
-          ? "Uniswap V3"
-          : "Uniswap V3";
-
     return {
       usdValue,
       output,
       impact,
       minimum,
       slippage,
-      route,
+      execution: "Dubu AMM",
       networkCost: usdValue > 25_000 ? 11.42 : 6.18,
       rate: tokens[fromToken].price / tokens[toToken].price,
     };
@@ -262,7 +253,7 @@ export default function SwapPage() {
                   <div><dt>Price impact</dt><dd className={quote.impact >= 0.4 ? "warning" : ""}>{quote.impact.toFixed(2)}%</dd></div>
                   <div><dt>Minimum received</dt><dd>{formatTokenAmount(quote.minimum, toToken)} {toToken}</dd></div>
                   <div><dt>Max slippage</dt><dd>{quote.slippage.toFixed(1)}%</dd></div>
-                  <div><dt>Order routing</dt><dd>{quote.route} <span className="route-info-dot">ⓘ</span></dd></div>
+                  <div><dt>Execution</dt><dd>{quote.execution} <span className="route-info-dot">ⓘ</span></dd></div>
                 </dl>
               )}
             </div>
