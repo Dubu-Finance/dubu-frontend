@@ -10,11 +10,11 @@ import {
 } from "@/app/components/AppShell";
 
 const pools = [
-  { a: "ETH", b: "USDC", model: "Volatile", fee: "0.30%", accent: "gold" },
-  { a: "USDC", b: "USDT", model: "Stable", fee: "0.05%", accent: "green" },
-  { a: "ETH", b: "USDT", model: "Volatile", fee: "0.30%", accent: "blue" },
-  { a: "WBTC", b: "ETH", model: "Volatile", fee: "0.30%", accent: "orange" },
-  { a: "ETH", b: "DAI", model: "Volatile", fee: "0.30%", accent: "violet" },
+  { a: "ETH", b: "USDC", model: "Volatile", fee: "0.30%", accent: "gold", blueChip: true },
+  { a: "USDC", b: "USDT", model: "Stable", fee: "0.05%", accent: "green", blueChip: false },
+  { a: "ETH", b: "USDT", model: "Volatile", fee: "0.30%", accent: "blue", blueChip: true },
+  { a: "WBTC", b: "ETH", model: "Volatile", fee: "0.30%", accent: "orange", blueChip: true },
+  { a: "ETH", b: "DAI", model: "Volatile", fee: "0.30%", accent: "violet", blueChip: false },
 ];
 
 type Pool = (typeof pools)[number];
@@ -22,8 +22,9 @@ type Pool = (typeof pools)[number];
 export default function PoolsPage() {
   const { connected, ethBalance, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [activeTab, setActiveTab] = useState<"Explore" | "Positions">("Explore");
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState("All Pools");
   const [search, setSearch] = useState("");
+  const [ascending, setAscending] = useState(true);
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [composerPool, setComposerPool] = useState<Pool | null>(null);
   const [amountA, setAmountA] = useState("");
@@ -34,9 +35,15 @@ export default function PoolsPage() {
   const filteredPools = useMemo(() => pools.filter((pool) => {
     const pair = `${pool.a}/${pool.b}`.toLowerCase();
     const matchesSearch = pair.includes(search.trim().toLowerCase());
-    const matchesFilter = filter === "All" || pool.model === filter;
+    const matchesFilter = filter === "All Pools"
+      || (filter === "Stablecoins" && pool.model === "Stable")
+      || (filter === "Volatile" && pool.model === "Volatile")
+      || (filter === "Blue Chips" && pool.blueChip);
     return matchesSearch && matchesFilter;
-  }), [filter, search]);
+  }).sort((left, right) => {
+    const comparison = `${left.a}/${left.b}`.localeCompare(`${right.a}/${right.b}`);
+    return ascending ? comparison : -comparison;
+  }), [ascending, filter, search]);
 
   function openComposer(pool = pools[0]) {
     setComposerPool(pool);
@@ -73,8 +80,8 @@ export default function PoolsPage() {
     <>
       <div className="dex-pools-header">
         <AppPageHeader
-          title="Liquidity"
-          description="Explore Dubu pools and provide liquidity on GIWA Sepolia."
+          title="Liquidity Pools"
+          description="Explore pools and deploy capital to earn swap fees on Dubu."
         />
         <div className="dex-pools-header-actions">
           <button className="pool-secondary-action" type="button" onClick={() => setActiveTab("Positions")}>
@@ -114,49 +121,60 @@ export default function PoolsPage() {
               </button>
             ))}
           </div>
-          {activeTab === "Explore" && (
-            <div className="pool-browser-tools">
-              <label className="app-search pool-search">
-                <span>⌕</span>
-                <input
-                  aria-label="Search pools"
-                  placeholder="Search token or pair"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </label>
-              <div className="pool-filter-group" aria-label="Pool type filter">
-                {["All", "Stable", "Volatile"].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={filter === item ? "active" : ""}
-                    onClick={() => setFilter(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {activeTab === "Explore" ? (
           <>
+            <div className="pool-category-row" aria-label="Pool category filter">
+              {["All Pools", "Stablecoins", "Volatile", "Blue Chips"].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={filter === item ? "active" : ""}
+                  onClick={() => setFilter(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="pool-browser-tools pool-browser-tools-wide">
+              <label className="app-search pool-search">
+                <span>⌕</span>
+                <input
+                  aria-label="Search pools"
+                  placeholder="Search tokens or pairs"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
+              <div className="pool-table-controls">
+                <button
+                  type="button"
+                  className="pool-icon-control"
+                  onClick={() => setAscending((value) => !value)}
+                  aria-label={`Sort pools ${ascending ? "descending" : "ascending"}`}
+                  title="Sort pools"
+                >
+                  {ascending ? "A↓" : "Z↑"}
+                </button>
+                <span className="pool-indexer-status"><i /> Market data pending</span>
+              </div>
+            </div>
             <div className="pool-list-caption">
               <span>{filteredPools.length} available pools</span>
-              <p>Live pool metrics appear after the Dubu indexer and contracts are connected.</p>
+              <p>Pool metrics populate automatically when the Dubu indexer is connected.</p>
             </div>
             <div className="app-table-wrap pool-explorer-table-wrap">
               <table className="app-table pool-explorer-table">
                 <thead>
                   <tr>
                     <th>Pool</th>
-                    <th>Model</th>
-                    <th>Fee tier</th>
+                    <th>Price trend 7D</th>
+                    <th>Yield / TVL</th>
+                    <th>Volume 24h</th>
                     <th>TVL</th>
-                    <th>24h volume</th>
-                    <th>APR</th>
+                    <th>Fees 24h</th>
+                    <th>Rewards 24h</th>
                     <th />
                   </tr>
                 </thead>
@@ -169,14 +187,18 @@ export default function PoolsPage() {
                             <TokenIcon symbol={pool.a} />
                             <TokenIcon symbol={pool.b} />
                           </span>
-                          <div><strong>{pool.a} / {pool.b}</strong><small>GIWA Sepolia</small></div>
+                          <div>
+                            <strong>{pool.a} / {pool.b}</strong>
+                            <small><span className={`pool-model-dot ${pool.model.toLowerCase()}`} />{pool.model} · {pool.fee}</small>
+                          </div>
                         </div>
                       </td>
-                      <td><span className={`pool-model-badge ${pool.model.toLowerCase()}`}>{pool.model}</span></td>
-                      <td>{pool.fee}</td>
-                      <td className="pool-data-pending">—</td>
-                      <td className="pool-data-pending">—</td>
-                      <td className="pool-data-pending">—</td>
+                      <td><span className="pool-trend-placeholder" aria-label="Price trend awaiting indexer"><i /><i /><i /><i /><i /></span></td>
+                      <td><span className="pool-metric-pending">—<small>Awaiting indexer</small></span></td>
+                      <td><span className="pool-metric-pending">—<small>Awaiting indexer</small></span></td>
+                      <td><span className="pool-metric-pending">—<small>Awaiting indexer</small></span></td>
+                      <td><span className="pool-metric-pending">—<small>Awaiting indexer</small></span></td>
+                      <td><span className="pool-metric-pending">—<small>Not enabled</small></span></td>
                       <td>
                         <button
                           className="pool-row-action"
@@ -190,7 +212,7 @@ export default function PoolsPage() {
                     </tr>
                   ))}
                   {filteredPools.length === 0 && (
-                    <tr><td colSpan={7} className="empty-cell">No pools match this search.</td></tr>
+                    <tr><td colSpan={8} className="empty-cell">No pools match this search.</td></tr>
                   )}
                 </tbody>
               </table>
