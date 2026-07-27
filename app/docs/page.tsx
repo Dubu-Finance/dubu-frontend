@@ -16,7 +16,7 @@ const docGroups = [
   {
     title: "Trading",
     items: [
-      ["Quotes & routing", "execution-details"],
+      ["Quotes & pricing", "execution-details"],
       ["Price impact", "execution-details"],
       ["Slippage", "execution-details"],
       ["Limit orders", "execution-details"],
@@ -93,7 +93,7 @@ export default function DocsPage() {
         <nav className={menuOpen ? "docs-top-nav open" : "docs-top-nav"} aria-label="Primary navigation">
           <Link href="/swap" onClick={() => setMenuOpen(false)}>Swap</Link>
           <Link href="/#why" onClick={() => setMenuOpen(false)}>Why Dubu</Link>
-          <Link href="/#routing" onClick={() => setMenuOpen(false)}>Routing</Link>
+          <Link href="/#routing" onClick={() => setMenuOpen(false)}>AMM</Link>
           <Link className="active" href="/docs" onClick={() => setMenuOpen(false)}>Docs</Link>
         </nav>
 
@@ -221,7 +221,7 @@ export default function DocsPage() {
               <article>
                 <span>03</span>
                 <h3>Useful defaults</h3>
-                <p>Slippage and routing start in automatic mode but remain adjustable.</p>
+                <p>Slippage and price protection start in automatic mode but remain adjustable.</p>
               </article>
             </div>
           </section>

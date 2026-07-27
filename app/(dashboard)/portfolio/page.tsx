@@ -46,8 +46,8 @@ export default function PortfolioPage() {
   return (
     <>
       <div className="portfolio-connected-header">
-        <AppPageHeader title="Portfolio" description="Balances and positions on Ethereum." />
-        <div className="portfolio-account-chip"><span className="app-wallet-orb" /><div><strong>{shortAddress}</strong><small>Ethereum</small></div></div>
+        <AppPageHeader title="Portfolio" description="Balances and positions on GIWA Sepolia." />
+        <div className="portfolio-account-chip"><span className="app-wallet-orb" /><div><strong>{shortAddress}</strong><small>GIWA Sepolia</small></div></div>
       </div>
 
       <div className="portfolio-summary-grid connected">
@@ -67,7 +67,7 @@ export default function PortfolioPage() {
           <SectionTitle>Token balances</SectionTitle>
           <div className="portfolio-token-row">
             <TokenIcon symbol="ETH" />
-            <div><strong>Ethereum</strong><span>ETH</span></div>
+            <div><strong>Ether</strong><span>ETH · GIWA</span></div>
             <div><strong>{ethBalance ?? "0.0000"} ETH</strong><span>${portfolioValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span></div>
           </div>
           <p>ERC-20 balances require an indexed data source and will appear when the portfolio API is connected.</p>
@@ -77,7 +77,7 @@ export default function PortfolioPage() {
           <SectionTitle>Network</SectionTitle>
           <div className="network-allocation">
             <div className="network-donut"><span>100%</span></div>
-            <div><strong>Ethereum</strong><span>${portfolioValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span></div>
+            <div><strong>GIWA Sepolia</strong><span>${portfolioValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span></div>
           </div>
         </Panel>
       </div>

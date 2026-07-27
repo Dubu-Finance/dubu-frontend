@@ -34,8 +34,19 @@ type AppWalletContextValue = {
   connecting: boolean;
   address: string;
   ethBalance: string | null;
+  onGiwa: boolean;
   openWallet: () => void;
+  switchToGiwa: () => Promise<void>;
   disconnect: () => void;
+};
+
+const GIWA_CHAIN_ID = "0x164ce";
+const GIWA_CHAIN = {
+  chainId: GIWA_CHAIN_ID,
+  chainName: "GIWA Sepolia",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: ["https://sepolia-rpc.giwa.io"],
+  blockExplorerUrls: ["https://sepolia-explorer.giwa.io"],
 };
 
 const AppThemeContext = createContext<AppThemeContextValue>({
@@ -48,7 +59,9 @@ const AppWalletContext = createContext<AppWalletContextValue>({
   connecting: false,
   address: "",
   ethBalance: null,
+  onGiwa: false,
   openWallet: () => undefined,
+  switchToGiwa: async () => undefined,
   disconnect: () => undefined,
 });
 
@@ -72,13 +85,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [theme, setThemeState] = useState<Theme>("light");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [networkOpen, setNetworkOpen] = useState(false);
-  const [network, setNetwork] = useState("Ethereum");
   const [walletOpen, setWalletOpen] = useState(false);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [address, setAddress] = useState("");
   const [ethBalance, setEthBalance] = useState<string | null>(null);
+  const [chainId, setChainId] = useState("");
   const [walletError, setWalletError] = useState("");
 
   useEffect(() => {
@@ -89,6 +101,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const provider = window.ethereum;
     if (!provider) return;
+
+    void provider.request({ method: "eth_chainId" })
+      .then((value) => setChainId(String(value).toLowerCase()))
+      .catch(() => setChainId(""));
 
     const handleAccountsChanged = (...args: unknown[]) => {
       const accounts = args[0] as string[] | undefined;
@@ -101,9 +117,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       void readBalance(accounts[0], provider);
     };
 
+    const handleChainChanged = (...args: unknown[]) => {
+      setChainId(String(args[0] ?? "").toLowerCase());
+      if (address) void readBalance(address, provider);
+    };
+
     provider.on?.("accountsChanged", handleAccountsChanged);
-    return () => provider.removeListener?.("accountsChanged", handleAccountsChanged);
-  }, []);
+    provider.on?.("chainChanged", handleChainChanged);
+    return () => {
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
+      provider.removeListener?.("chainChanged", handleChainChanged);
+    };
+  }, [address]);
 
   function setTheme(nextTheme: Theme) {
     setThemeState(nextTheme);
@@ -139,12 +164,56 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const account = Array.isArray(result) ? String(result[0] ?? "") : "";
       if (!account) throw new Error("No account returned");
       setAddress(account);
+      const activeChain = await provider.request({ method: "eth_chainId" });
+      setChainId(String(activeChain).toLowerCase());
       await readBalance(account, provider);
       setWalletOpen(false);
     } catch {
       setWalletError("The connection request was cancelled or could not be completed.");
     } finally {
       setConnecting(false);
+    }
+  }
+
+  async function switchToGiwa() {
+    const provider = window.ethereum;
+    setWalletError("");
+    if (!provider) {
+      setWalletError("No browser wallet was detected. Install MetaMask or Rabby, then try again.");
+      setWalletOpen(true);
+      return;
+    }
+
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: GIWA_CHAIN_ID }],
+      });
+      setChainId(GIWA_CHAIN_ID);
+      if (address) await readBalance(address, provider);
+    } catch (error) {
+      const code = typeof error === "object" && error && "code" in error
+        ? Number((error as { code?: unknown }).code)
+        : 0;
+
+      if (code === 4902) {
+        try {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [GIWA_CHAIN],
+          });
+          setChainId(GIWA_CHAIN_ID);
+          if (address) await readBalance(address, provider);
+          return;
+        } catch {
+          setWalletError("GIWA Sepolia could not be added to your wallet.");
+          setWalletOpen(true);
+          return;
+        }
+      }
+
+      setWalletError("The network switch was cancelled or could not be completed.");
+      setWalletOpen(true);
     }
   }
 
@@ -161,13 +230,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       connecting,
       address,
       ethBalance,
+      onGiwa: chainId === GIWA_CHAIN_ID,
       openWallet: () => {
         setWalletError("");
         setWalletOpen(true);
       },
+      switchToGiwa,
       disconnect,
     }),
-    [address, connecting, ethBalance],
+    [address, chainId, connecting, ethBalance],
   );
 
   const shortAddress = address
@@ -242,39 +313,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             <div className="app-topbar-actions">
-              <div className="app-network-wrap">
-                <button
-                  className="app-control app-network-button"
-                  type="button"
-                  aria-haspopup="listbox"
-                  aria-expanded={networkOpen}
-                  onClick={() => setNetworkOpen((current) => !current)}
-                >
-                  <TokenIcon symbol={network === "Ethereum" ? "ETH" : network === "Arbitrum" ? "ARB" : "OP"} />
-                  <span>{network}</span>
-                  <b>⌄</b>
+              {address && chainId && chainId !== GIWA_CHAIN_ID ? (
+                <button className="app-control app-network-button network-warning" type="button" onClick={() => void switchToGiwa()}>
+                  <span className="giwa-chain-mark" aria-hidden="true">G</span>
+                  <span>Switch to GIWA</span>
+                  <b>↗</b>
                 </button>
-                {networkOpen && (
-                  <div className="app-network-menu" role="listbox" aria-label="Select network">
-                    {["Ethereum", "Arbitrum", "Optimism"].map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        role="option"
-                        aria-selected={option === network}
-                        onClick={() => {
-                          setNetwork(option);
-                          setNetworkOpen(false);
-                        }}
-                      >
-                        <TokenIcon symbol={option === "Ethereum" ? "ETH" : option === "Arbitrum" ? "ARB" : "OP"} />
-                        <span>{option}</span>
-                        {option === network && <b>✓</b>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="app-control app-network-button network-fixed" aria-label="Connected network: GIWA Sepolia">
+                  <span className="giwa-chain-mark" aria-hidden="true">G</span>
+                  <span>GIWA Sepolia</span>
+                  <b className="network-live-dot" aria-hidden="true" />
+                </div>
+              )}
 
               <button
                 className="app-control app-theme-button"
@@ -314,14 +365,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="app-modal-backdrop" role="presentation">
             <div className="app-modal wallet-connect-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
               <button className="app-modal-close" type="button" aria-label="Close wallet dialog" onClick={() => setWalletOpen(false)}>×</button>
-              <div className="wallet-modal-mark"><img src="/assets/character.png" alt="" /></div>
-              <h2 id="wallet-title">Connect a wallet</h2>
-              <p>Choose a browser wallet to continue. Dubu never takes custody of your assets.</p>
-              <button className="wallet-provider-button" type="button" onClick={connectInjectedWallet} disabled={connecting}>
-                <span className="wallet-provider-icon">◆</span>
-                <span><strong>{connecting ? "Waiting for wallet…" : "Browser wallet"}</strong><small>MetaMask, Rabby, Coinbase Wallet</small></span>
-                <b>›</b>
-              </button>
+              <div className="wallet-modal-mark">
+                {address && chainId !== GIWA_CHAIN_ID
+                  ? <span className="giwa-chain-mark">G</span>
+                  : <img src="/assets/character.png" alt="" />}
+              </div>
+              <h2 id="wallet-title">{address && chainId !== GIWA_CHAIN_ID ? "Switch to GIWA" : "Connect a wallet"}</h2>
+              <p>
+                {address && chainId !== GIWA_CHAIN_ID
+                  ? "Dubu operates on GIWA Sepolia. Switch networks to continue."
+                  : "Choose a browser wallet to continue. Dubu never takes custody of your assets."}
+              </p>
+              {address && chainId !== GIWA_CHAIN_ID ? (
+                <button className="wallet-provider-button" type="button" onClick={() => void switchToGiwa()}>
+                  <span className="wallet-provider-icon"><span className="giwa-chain-mark small">G</span></span>
+                  <span><strong>GIWA Sepolia</strong><small>Chain ID 91342 · ETH gas</small></span>
+                  <b>↗</b>
+                </button>
+              ) : (
+                <button className="wallet-provider-button" type="button" onClick={connectInjectedWallet} disabled={connecting}>
+                  <span className="wallet-provider-icon">◆</span>
+                  <span><strong>{connecting ? "Waiting for wallet…" : "Browser wallet"}</strong><small>MetaMask, Rabby, Coinbase Wallet</small></span>
+                  <b>›</b>
+                </button>
+              )}
               {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
               <div className="wallet-terms">By connecting, you agree to Dubu&apos;s terms and acknowledge the risks of onchain trading.</div>
             </div>
@@ -337,7 +404,6 @@ export function TokenIcon({ symbol }: { symbol: string }) {
   const imageMap: Record<string, string> = {
     ETH: "/assets/asset_04.png",
     USDC: "/assets/asset_05.png",
-    ARB: "/assets/asset_06.png",
   };
 
   if (imageMap[symbol]) {
@@ -347,15 +413,6 @@ export function TokenIcon({ symbol }: { symbol: string }) {
   const compact = symbol.slice(0, 2).toUpperCase();
   return (
     <span className={`token-icon token-icon-css token-${symbol.toLowerCase()}`} aria-hidden="true">
-      {compact}
-    </span>
-  );
-}
-
-export function ProtocolIcon({ name }: { name: string }) {
-  const compact = name === "Uniswap V3" ? "U" : name.slice(0, 1);
-  return (
-    <span className={`protocol-icon protocol-${name.toLowerCase().replaceAll(" ", "-")}`} aria-hidden="true">
       {compact}
     </span>
   );

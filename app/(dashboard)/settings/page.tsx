@@ -7,7 +7,6 @@ import {
   SectionTitle,
   Toast,
   Toggle,
-  TokenIcon,
   useAppTheme,
   useAppWallet,
 } from "@/app/components/AppShell";
@@ -50,7 +49,7 @@ export default function SettingsPage() {
               <div><strong>{shortAddress}</strong><span>Connected</span></div>
               <dl>
                 <div><dt>Balance</dt><dd>{ethBalance ?? "—"} ETH</dd></div>
-                <div><dt>Network</dt><dd><TokenIcon symbol="ETH" /> Ethereum</dd></div>
+                <div><dt>Network</dt><dd><span className="giwa-chain-mark small">G</span> GIWA Sepolia</dd></div>
               </dl>
               <button className="wallet-disconnect-button" type="button" onClick={disconnect}>Disconnect</button>
             </>

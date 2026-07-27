@@ -14,7 +14,7 @@ type TokenSymbol = "ETH" | "USDC" | "USDT" | "DAI" | "WBTC";
 type TradeMode = "Swap" | "Limit" | "TWAP";
 
 const tokens: Record<TokenSymbol, { name: string; price: number; balance: string }> = {
-  ETH: { name: "Ethereum", price: 2568.7, balance: "—" },
+  ETH: { name: "Ether", price: 2568.7, balance: "—" },
   USDC: { name: "USD Coin", price: 1, balance: "—" },
   USDT: { name: "Tether", price: 0.9994, balance: "—" },
   DAI: { name: "Dai", price: 1.0002, balance: "—" },
@@ -34,7 +34,7 @@ function formatTokenAmount(value: number, symbol: TokenSymbol) {
 }
 
 export default function SwapPage() {
-  const { connected, ethBalance, openWallet } = useAppWallet();
+  const { connected, ethBalance, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [mode, setMode] = useState<TradeMode>("Swap");
   const [fromToken, setFromToken] = useState<TokenSymbol>("ETH");
   const [toToken, setToToken] = useState<TokenSymbol>("USDC");
@@ -115,6 +115,10 @@ export default function SwapPage() {
       openWallet();
       return;
     }
+    if (!onGiwa) {
+      void switchToGiwa();
+      return;
+    }
     if (fromToken !== "ETH" && !approvedTokens.includes(fromToken)) {
       setApprovalOpen(true);
       return;
@@ -141,6 +145,8 @@ export default function SwapPage() {
       ? "Fetching quote…"
       : !connected
         ? "Connect wallet"
+        : !onGiwa
+          ? "Switch to GIWA"
         : fromToken !== "ETH" && !approvedTokens.includes(fromToken)
           ? `Approve ${fromToken}`
           : mode === "Swap"
@@ -155,7 +161,7 @@ export default function SwapPage() {
         <div className="trade-heading">
           <div>
             <h1>Trade</h1>
-            <span>Ethereum</span>
+            <span>GIWA Sepolia</span>
           </div>
         </div>
 
@@ -338,7 +344,7 @@ export default function SwapPage() {
             <button className="app-modal-close" type="button" aria-label="Close approval" onClick={() => setApprovalOpen(false)}>×</button>
             <TokenIcon symbol={fromToken} />
             <h2 id="approval-title">Approve {fromToken}</h2>
-            <p>Allow the Dubu router to use your {fromToken} for this trade. This is required once per token.</p>
+            <p>Allow the Dubu AMM contract to use your {fromToken} for this trade. This is required once per token.</p>
             <button className="app-primary-button" type="button" onClick={approveToken}>Approve in wallet</button>
             <button className="app-quiet-button" type="button" onClick={() => setApprovalOpen(false)}>Cancel</button>
           </div>

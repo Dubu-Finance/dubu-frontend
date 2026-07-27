@@ -17,15 +17,15 @@ const pairs = [
   { a: "USDC", b: "USDT", volume: "$9.81M", share: "20.3%", change: "+15.7%" },
   { a: "ETH", b: "USDT", volume: "$6.72M", share: "13.9%", change: "+17.8%" },
   { a: "WBTC", b: "ETH", volume: "$4.93M", share: "10.2%", change: "+11.6%" },
-  { a: "ARB", b: "ETH", volume: "$3.26M", share: "6.8%", change: "+9.4%" },
+  { a: "ETH", b: "DAI", volume: "$3.26M", share: "6.8%", change: "+9.4%" },
 ];
 
-const networks = [
-  { name: "Ethereum", symbol: "ETH", volume: "$32.41M", change: "+18.9%", data: [2, 4, 3, 6, 5, 8, 6, 4, 7, 6, 9] },
-  { name: "Arbitrum", symbol: "ARB", volume: "$9.27M", change: "+16.4%", data: [3, 3, 5, 4, 7, 6, 4, 5, 7, 6, 8] },
-  { name: "Base", symbol: "BASE", volume: "$4.18M", change: "+22.7%", data: [2, 2, 4, 3, 6, 4, 7, 5, 8, 6, 9] },
-  { name: "Optimism", symbol: "OP", volume: "$2.46M", change: "+11.3%", data: [5, 4, 6, 5, 3, 5, 6, 4, 6, 5, 7] },
-  { name: "Polygon", symbol: "MATIC", volume: "$0.82M", change: "+8.6%", data: [2, 2, 3, 2, 4, 3, 4, 4, 3, 5, 8] },
+const poolActivity = [
+  { a: "ETH", b: "USDC", type: "Volatile", fee: "0.30%", status: "Active" },
+  { a: "USDC", b: "USDT", type: "Stable", fee: "0.05%", status: "Active" },
+  { a: "ETH", b: "USDT", type: "Volatile", fee: "0.30%", status: "Active" },
+  { a: "WBTC", b: "ETH", type: "Volatile", fee: "0.30%", status: "Active" },
+  { a: "ETH", b: "DAI", type: "Volatile", fee: "0.30%", status: "Active" },
 ];
 
 export default function AnalyticsPage() {
@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <AppPageHeader title="Analytics" description="Protocol activity across supported networks." />
+      <AppPageHeader title="Analytics" description="Dubu AMM activity on GIWA Sepolia." />
 
       <div className="analytics-stat-grid">
         {[
@@ -119,22 +119,23 @@ export default function AnalyticsPage() {
         </Panel>
 
         <Panel className="analytics-table-panel">
-          <SectionTitle>Network Activity</SectionTitle>
+          <SectionTitle>Pool Activity</SectionTitle>
           <div className="app-table-wrap">
-            <table className="app-table network-table">
-              <thead><tr><th>Network</th><th>Volume (7D)</th><th>7D Change</th><th>Trend (7D)</th></tr></thead>
+            <table className="app-table">
+              <thead><tr><th>Pool</th><th>Model</th><th>Fee tier</th><th>Status</th></tr></thead>
               <tbody>
-                {networks.map((network) => (
-                  <tr key={network.name}>
-                    <td><div className="asset-cell"><TokenIcon symbol={network.symbol} /><strong>{network.name}</strong></div></td>
-                    <td>{network.volume}</td><td className="positive">{network.change}</td>
-                    <td className="mini-chart"><Sparkline data={network.data} height={34} label={`${network.name} network volume trend`} /></td>
+                {poolActivity.map((pool) => (
+                  <tr key={`${pool.a}-${pool.b}`}>
+                    <td><div className="pool-pair"><span><TokenIcon symbol={pool.a} /><TokenIcon symbol={pool.b} /></span><strong>{pool.a} / {pool.b}</strong></div></td>
+                    <td>{pool.type}</td>
+                    <td>{pool.fee}</td>
+                    <td><span className="pool-live-status"><i />{pool.status}</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button className="table-footer-action" type="button">View all networks <span>›</span></button>
+          <button className="table-footer-action" type="button">View all pools <span>›</span></button>
         </Panel>
       </div>
     </>
