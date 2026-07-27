@@ -12,9 +12,30 @@ import {
 
 type Theme = "light" | "dark";
 
+type EthereumProvider = {
+  request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, listener: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+};
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
+}
+
 type AppThemeContextValue = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+};
+
+type AppWalletContextValue = {
+  connected: boolean;
+  connecting: boolean;
+  address: string;
+  ethBalance: string | null;
+  openWallet: () => void;
+  disconnect: () => void;
 };
 
 const AppThemeContext = createContext<AppThemeContextValue>({
@@ -22,8 +43,21 @@ const AppThemeContext = createContext<AppThemeContextValue>({
   setTheme: () => undefined,
 });
 
+const AppWalletContext = createContext<AppWalletContextValue>({
+  connected: false,
+  connecting: false,
+  address: "",
+  ethBalance: null,
+  openWallet: () => undefined,
+  disconnect: () => undefined,
+});
+
 export function useAppTheme() {
   return useContext(AppThemeContext);
+}
+
+export function useAppWallet() {
+  return useContext(AppWalletContext);
 }
 
 const navItems = [
@@ -40,10 +74,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
   const [network, setNetwork] = useState("Ethereum");
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [address, setAddress] = useState("");
+  const [ethBalance, setEthBalance] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState("");
 
   useEffect(() => {
     const saved = window.localStorage.getItem("dubu-app-theme");
     if (saved === "dark") setThemeState("dark");
+  }, []);
+
+  useEffect(() => {
+    const provider = window.ethereum;
+    if (!provider) return;
+
+    const handleAccountsChanged = (...args: unknown[]) => {
+      const accounts = args[0] as string[] | undefined;
+      if (!accounts?.[0]) {
+        setAddress("");
+        setEthBalance(null);
+        return;
+      }
+      setAddress(accounts[0]);
+      void readBalance(accounts[0], provider);
+    };
+
+    provider.on?.("accountsChanged", handleAccountsChanged);
+    return () => provider.removeListener?.("accountsChanged", handleAccountsChanged);
   }, []);
 
   function setTheme(nextTheme: Theme) {
@@ -51,11 +110,74 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem("dubu-app-theme", nextTheme);
   }
 
+  async function readBalance(account: string, provider = window.ethereum) {
+    if (!provider) return;
+    try {
+      const value = await provider.request({
+        method: "eth_getBalance",
+        params: [account, "latest"],
+      });
+      const wei = BigInt(String(value));
+      setEthBalance((Number(wei) / 1e18).toFixed(4));
+    } catch {
+      setEthBalance(null);
+    }
+  }
+
+  async function connectInjectedWallet() {
+    const provider = window.ethereum;
+    setWalletError("");
+
+    if (!provider) {
+      setWalletError("No browser wallet was detected. Install MetaMask or Rabby, then try again.");
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      const result = await provider.request({ method: "eth_requestAccounts" });
+      const account = Array.isArray(result) ? String(result[0] ?? "") : "";
+      if (!account) throw new Error("No account returned");
+      setAddress(account);
+      await readBalance(account, provider);
+      setWalletOpen(false);
+    } catch {
+      setWalletError("The connection request was cancelled or could not be completed.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  function disconnect() {
+    setAddress("");
+    setEthBalance(null);
+    setWalletMenuOpen(false);
+  }
+
   const contextValue = useMemo(() => ({ theme, setTheme }), [theme]);
+  const walletContextValue = useMemo(
+    () => ({
+      connected: Boolean(address),
+      connecting,
+      address,
+      ethBalance,
+      openWallet: () => {
+        setWalletError("");
+        setWalletOpen(true);
+      },
+      disconnect,
+    }),
+    [address, connecting, ethBalance],
+  );
+
+  const shortAddress = address
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : "";
 
   return (
     <AppThemeContext.Provider value={contextValue}>
-      <div className={`app-shell ${theme === "dark" ? "app-dark" : ""}`}>
+      <AppWalletContext.Provider value={walletContextValue}>
+        <div className={`app-shell ${theme === "dark" ? "app-dark" : ""}`}>
         <aside className={menuOpen ? "app-sidebar app-sidebar-open" : "app-sidebar"}>
           <div className="app-sidebar-head">
             <Link className="app-brand" href="/" aria-label="Back to Dubu landing page">
@@ -163,16 +285,50 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {theme === "light" ? "☼" : "☾"}
               </button>
 
-              <button className="app-control app-wallet-button" type="button">
-                <span className="app-wallet-orb" />
-                <span>0x4a7b...3F2c</span>
-              </button>
+              <div className="app-wallet-wrap">
+                <button
+                  className={`app-control app-wallet-button ${address ? "" : "disconnected"}`}
+                  type="button"
+                  onClick={() => address ? setWalletMenuOpen((current) => !current) : setWalletOpen(true)}
+                >
+                  {address ? <span className="app-wallet-orb" /> : <span className="wallet-button-dot" />}
+                  <span>{address ? shortAddress : "Connect wallet"}</span>
+                </button>
+                {address && walletMenuOpen && (
+                  <div className="wallet-account-menu">
+                    <div>
+                      <span className="app-wallet-orb" />
+                      <p><strong>{shortAddress}</strong><small>{ethBalance ? `${ethBalance} ETH` : "Balance unavailable"}</small></p>
+                    </div>
+                    <button type="button" onClick={() => void navigator.clipboard.writeText(address)}>Copy address</button>
+                    <button type="button" onClick={disconnect}>Disconnect</button>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
           <main className="app-content">{children}</main>
         </div>
-      </div>
+        {walletOpen && (
+          <div className="app-modal-backdrop" role="presentation">
+            <div className="app-modal wallet-connect-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+              <button className="app-modal-close" type="button" aria-label="Close wallet dialog" onClick={() => setWalletOpen(false)}>×</button>
+              <div className="wallet-modal-mark"><img src="/assets/character.png" alt="" /></div>
+              <h2 id="wallet-title">Connect a wallet</h2>
+              <p>Choose a browser wallet to continue. Dubu never takes custody of your assets.</p>
+              <button className="wallet-provider-button" type="button" onClick={connectInjectedWallet} disabled={connecting}>
+                <span className="wallet-provider-icon">◆</span>
+                <span><strong>{connecting ? "Waiting for wallet…" : "Browser wallet"}</strong><small>MetaMask, Rabby, Coinbase Wallet</small></span>
+                <b>›</b>
+              </button>
+              {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
+              <div className="wallet-terms">By connecting, you agree to Dubu&apos;s terms and acknowledge the risks of onchain trading.</div>
+            </div>
+          </div>
+        )}
+        </div>
+      </AppWalletContext.Provider>
     </AppThemeContext.Provider>
   );
 }

@@ -43,12 +43,11 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Swap");
   const [fromToken, setFromToken] = useState<"ETH" | "USDC">("ETH");
-  const [amount, setAmount] = useState("1.00");
-  const [swapping, setSwapping] = useState(false);
+  const [amount, setAmount] = useState("");
 
   const output = useMemo(() => {
     const value = Number.parseFloat(amount || "0");
-    if (!Number.isFinite(value)) return "0.00";
+    if (!Number.isFinite(value) || value <= 0) return "0";
     return fromToken === "ETH"
       ? (value * 2543.71).toLocaleString("en-US", {
           maximumFractionDigits: 2,
@@ -64,11 +63,6 @@ export default function Home() {
   function reversePair() {
     setFromToken((current) => (current === "ETH" ? "USDC" : "ETH"));
     setAmount(output.replaceAll(",", ""));
-  }
-
-  function simulateSwap() {
-    setSwapping(true);
-    window.setTimeout(() => setSwapping(false), 1100);
   }
 
   return (
@@ -163,7 +157,7 @@ export default function Home() {
 
             <div className="token-box">
               <div className="token-meta">
-                <span>From</span><span>Balance: 2.5687</span>
+                <span>You pay</span><span>Balance: —</span>
               </div>
               <div className="token-main">
                 <button className="token-select" type="button" onClick={reversePair}>
@@ -178,6 +172,7 @@ export default function Home() {
                   <input
                     inputMode="decimal"
                     value={amount}
+                    placeholder="0"
                     onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
                     aria-label="Amount to swap"
                   />
@@ -194,7 +189,7 @@ export default function Home() {
 
             <div className="token-box token-box-to">
               <div className="token-meta">
-                <span>To (estimated)</span><span>Balance: 1,234.56</span>
+                <span>You receive</span><span>Balance: —</span>
               </div>
               <div className="token-main">
                 <button className="token-select" type="button" onClick={reversePair}>
@@ -208,33 +203,27 @@ export default function Home() {
                   <strong>{output}</strong>
                   <small>
                     {toToken === "USDC"
-                      ? `$${output} `
+                      ? `$${output}`
                       : `$${((Number.parseFloat(output.replaceAll(",", "")) || 0) * 2543.71).toLocaleString("en-US", { maximumFractionDigits: 2 })} `}
-                    <b>(+0.97%)</b>
                   </small>
                 </div>
               </div>
             </div>
 
             <div className="route-summary">
-              <div className="route-title">
-                <span>Best price route</span>
-                <strong>1inch → Curve → Uniswap V3</strong>
-              </div>
-              <div className="route-detail"><span>Price</span><span>1 ETH = 2,543.71 USDC ↻</span></div>
-              <div className="route-detail"><span>Price impact</span><span className="positive">-0.97%</span></div>
-              <div className="route-detail"><span>Network fee</span><span>$2.11</span></div>
-              <div className="route-detail"><span>Estimated gas</span><span>0.0032 ETH ($8.21)</span></div>
-              <button
-                className="swap-button"
-                type="button"
-                onClick={simulateSwap}
-                disabled={swapping}
-              >
-                {swapping ? "Finding your best route…" : `${activeTab} ${fromToken} for ${toToken}`}
-              </button>
+              {Number(amount) > 0 && (
+                <>
+                  <div className="route-detail"><span>Rate</span><span>1 ETH = 2,543.71 USDC</span></div>
+                  <div className="route-detail"><span>Price impact</span><span>0.08%</span></div>
+                  <div className="route-detail"><span>Minimum received</span><span>{(Number(output.replaceAll(",", "")) * 0.995).toLocaleString("en-US", { maximumFractionDigits: 2 })} {toToken}</span></div>
+                  <div className="route-detail"><span>Network cost</span><span>$6.18</span></div>
+                </>
+              )}
+              <a className={`swap-button ${Number(amount) > 0 ? "" : "disabled"}`} href="/swap">
+                {Number(amount) > 0 ? `Review ${activeTab.toLowerCase()} in app` : "Enter an amount"}
+              </a>
             </div>
-            <div className="powered">◇ Powered by the best DEXs</div>
+            <div className="powered">Rates refresh automatically before confirmation.</div>
           </div>
         </div>
       </section>

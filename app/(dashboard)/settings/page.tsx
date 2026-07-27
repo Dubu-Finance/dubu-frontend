@@ -9,27 +9,22 @@ import {
   Toggle,
   TokenIcon,
   useAppTheme,
+  useAppWallet,
 } from "@/app/components/AppShell";
 
-type ToggleKey =
-  | "autoConnect"
-  | "hideSmall"
-  | "transactions"
-  | "priceAlerts"
-  | "productUpdates"
-  | "twoFactor";
+type ToggleKey = "autoSlippage" | "privateTx" | "multihop" | "hideSmall";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useAppTheme();
-  const [accent, setAccent] = useState("gold");
+  const { connected, address, ethBalance, openWallet, disconnect } = useAppWallet();
+  const [slippage, setSlippage] = useState("0.50");
+  const [deadline, setDeadline] = useState("20");
   const [saved, setSaved] = useState(false);
   const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
-    autoConnect: true,
+    autoSlippage: true,
+    privateTx: false,
+    multihop: true,
     hideSmall: false,
-    transactions: true,
-    priceAlerts: true,
-    productUpdates: false,
-    twoFactor: false,
   });
 
   function updateToggle(key: ToggleKey, value: boolean) {
@@ -37,120 +32,116 @@ export default function SettingsPage() {
   }
 
   function saveSettings() {
+    window.localStorage.setItem("dubu-trade-settings", JSON.stringify({ slippage, deadline, toggles }));
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2600);
   }
 
+  const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
+
   return (
     <>
       <div className="settings-header-row">
-        <AppPageHeader title="Settings" description="Configure your Dubu experience." />
-        <Panel className="wallet-summary">
-          <span className="app-wallet-orb large" />
-          <div><strong>0x4a7b...3F2c</strong><span>Connected</span></div>
-          <dl>
-            <div><dt>Balance</dt><dd>2.5687 ETH <small>$6,623.18</small></dd></div>
-            <div><dt>Network</dt><dd><TokenIcon symbol="ETH" /> Ethereum</dd></div>
-          </dl>
+        <AppPageHeader title="Settings" description="Trade execution and interface preferences." />
+        <Panel className={`wallet-summary ${connected ? "" : "disconnected"}`}>
+          {connected ? (
+            <>
+              <span className="app-wallet-orb large" />
+              <div><strong>{shortAddress}</strong><span>Connected</span></div>
+              <dl>
+                <div><dt>Balance</dt><dd>{ethBalance ?? "—"} ETH</dd></div>
+                <div><dt>Network</dt><dd><TokenIcon symbol="ETH" /> Ethereum</dd></div>
+              </dl>
+              <button className="wallet-disconnect-button" type="button" onClick={disconnect}>Disconnect</button>
+            </>
+          ) : (
+            <>
+              <div className="wallet-summary-empty"><span>◇</span><div><strong>No wallet connected</strong><small>Connect to manage account-specific settings.</small></div></div>
+              <button className="wallet-summary-connect" type="button" onClick={openWallet}>Connect wallet</button>
+            </>
+          )}
         </Panel>
       </div>
 
       <div className="settings-grid">
         <div className="settings-column">
           <Panel className="settings-panel">
-            <SectionTitle><span className="settings-title-icon">☷</span> Trading Settings</SectionTitle>
-            <SettingRow icon="◌" label="Slippage Tolerance" description="Set the maximum slippage for swaps.">
-              <label className="settings-input"><input aria-label="Slippage tolerance" defaultValue="0.50" /><span>%</span><b>⌄</b></label>
+            <SectionTitle><span className="settings-title-icon">⇄</span> Transaction settings</SectionTitle>
+            <SettingRow label="Automatic slippage" description="Adjust tolerance based on token liquidity and trade size.">
+              <Toggle checked={toggles.autoSlippage} onChange={(value) => updateToggle("autoSlippage", value)} label="Automatic slippage" />
             </SettingRow>
-            <SettingRow icon="◷" label="Transaction Deadline" description="Your transaction will revert after this time.">
-              <label className="settings-input"><input aria-label="Transaction deadline" defaultValue="20" /><span>min</span><b>⌄</b></label>
+            <SettingRow label="Max slippage" description="The transaction reverts if the price moves beyond this value.">
+              <label className={`settings-input ${toggles.autoSlippage ? "disabled" : ""}`}>
+                <input aria-label="Maximum slippage" value={slippage} disabled={toggles.autoSlippage} onChange={(event) => setSlippage(event.target.value.replace(/[^0-9.]/g, ""))} />
+                <span>%</span>
+              </label>
             </SettingRow>
-            <SettingRow icon="⌖" label="Default Network" description="Choose your preferred network for trading.">
-              <button className="settings-select" type="button"><TokenIcon symbol="ETH" /> Ethereum <b>⌄</b></button>
+            <SettingRow label="Transaction deadline" description="Pending swaps revert after this time.">
+              <label className="settings-input">
+                <input aria-label="Transaction deadline" value={deadline} onChange={(event) => setDeadline(event.target.value.replace(/\D/g, ""))} />
+                <span>min</span>
+              </label>
             </SettingRow>
           </Panel>
 
           <Panel className="settings-panel">
-            <SectionTitle><span className="settings-title-icon">▣</span> Wallet Preferences</SectionTitle>
-            <SettingRow icon="⇄" label="Auto-connect Wallet" description="Automatically connect your wallet on app load.">
-              <Toggle checked={toggles.autoConnect} onChange={(value) => updateToggle("autoConnect", value)} label="Auto-connect wallet" />
+            <SectionTitle><span className="settings-title-icon">⌁</span> Routing</SectionTitle>
+            <SettingRow label="Multi-hop routing" description="Allow the router to use intermediary tokens when it improves execution.">
+              <Toggle checked={toggles.multihop} onChange={(value) => updateToggle("multihop", value)} label="Multi-hop routing" />
             </SettingRow>
-            <SettingRow icon="$" label="Fiat Display" description="Show fiat values for balances and prices.">
-              <button className="settings-select short" type="button">USD <b>⌄</b></button>
+            <SettingRow label="Private transactions" description="Submit supported swaps through a private RPC to reduce MEV exposure.">
+              <Toggle checked={toggles.privateTx} onChange={(value) => updateToggle("privateTx", value)} label="Private transactions" />
             </SettingRow>
-            <SettingRow icon="◩" label="Hide Small Balances" description="Hide tokens with a low fiat value.">
-              <Toggle checked={toggles.hideSmall} onChange={(value) => updateToggle("hideSmall", value)} label="Hide small balances" />
+            <SettingRow label="Routing preference" description="Optimize quotes for received amount after network cost.">
+              <button className="settings-select" type="button">Best net output <b>⌄</b></button>
             </SettingRow>
           </Panel>
         </div>
 
         <div className="settings-column">
           <Panel className="settings-panel appearance-panel">
-            <SectionTitle><span className="settings-title-icon">◉</span> Appearance</SectionTitle>
+            <SectionTitle><span className="settings-title-icon">◉</span> Interface</SectionTitle>
             <div className="appearance-row">
               <strong>Theme</strong>
               <div className="theme-options">
                 <button className={theme === "light" ? "active" : ""} type="button" onClick={() => setTheme("light")}>☼ Light</button>
                 <button className={theme === "dark" ? "active" : ""} type="button" onClick={() => setTheme("dark")}>☾ Dark</button>
-                <button type="button" onClick={() => setTheme("light")}>▣ System</button>
               </div>
             </div>
-            <div className="appearance-row">
-              <strong>Accent Color</strong>
-              <div className="accent-options">
-                {["gold", "mint", "blue", "purple", "pink", "orange"].map((color) => (
-                  <button key={color} className={`${color} ${accent === color ? "active" : ""}`} type="button" aria-label={`Use ${color} accent`} onClick={() => setAccent(color)}>{accent === color ? "✓" : ""}</button>
-                ))}
-              </div>
-            </div>
-          </Panel>
-
-          <Panel className="settings-panel compact-settings">
-            <SectionTitle><span className="settings-title-icon">♧</span> Notifications</SectionTitle>
-            <SettingRow label="Transaction Updates" description="Get notified about transaction status.">
-              <Toggle checked={toggles.transactions} onChange={(value) => updateToggle("transactions", value)} label="Transaction updates" />
+            <SettingRow label="Fiat currency" description="Used for estimated token and network cost values.">
+              <button className="settings-select short" type="button">USD <b>⌄</b></button>
             </SettingRow>
-            <SettingRow label="Price Alerts" description="Receive alerts for price movements.">
-              <Toggle checked={toggles.priceAlerts} onChange={(value) => updateToggle("priceAlerts", value)} label="Price alerts" />
-            </SettingRow>
-            <SettingRow label="Product Updates" description="News and updates about Dubu.">
-              <Toggle checked={toggles.productUpdates} onChange={(value) => updateToggle("productUpdates", value)} label="Product updates" />
+            <SettingRow label="Hide small balances" description="Hide token balances worth less than $1.">
+              <Toggle checked={toggles.hideSmall} onChange={(value) => updateToggle("hideSmall", value)} label="Hide small balances" />
             </SettingRow>
           </Panel>
 
-          <Panel className="settings-panel compact-settings">
-            <SectionTitle><span className="settings-title-icon">♢</span> Security</SectionTitle>
-            <SettingRow label="Two-Factor Authentication" description="Add an extra layer of security to your account.">
-              <Toggle checked={toggles.twoFactor} onChange={(value) => updateToggle("twoFactor", value)} label="Two-factor authentication" />
-            </SettingRow>
-            <SettingRow label="Session Timeout" description="Automatically disconnect after inactivity.">
-              <button className="settings-select short" type="button">30 min <b>⌄</b></button>
-            </SettingRow>
+          <Panel className="settings-panel risk-settings-panel">
+            <SectionTitle><span className="settings-title-icon">!</span> Token safety</SectionTitle>
+            <p>Dubu shows warnings for unknown tokens, high price impact, and fee-on-transfer behavior. Token lists can still contain malicious assets.</p>
+            <button className="settings-text-button" type="button">Manage token lists <span>›</span></button>
           </Panel>
 
-          <button className="app-primary-button settings-save" type="button" onClick={saveSettings}>Save Changes</button>
+          <button className="app-primary-button settings-save" type="button" onClick={saveSettings}>Save preferences</button>
         </div>
       </div>
 
-      {saved && <Toast>Settings saved for this device.</Toast>}
+      {saved && <Toast>Preferences saved on this device.</Toast>}
     </>
   );
 }
 
 function SettingRow({
-  icon,
   label,
   description,
   children,
 }: {
-  icon?: string;
   label: string;
   description: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="setting-row">
-      {icon && <span className="setting-row-icon" aria-hidden="true">{icon}</span>}
+    <div className="setting-row setting-row-simple">
       <div><strong>{label}</strong><p>{description}</p></div>
       <div className="setting-row-control">{children}</div>
     </div>
