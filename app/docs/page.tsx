@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CONTRACTS, TOKENS } from "@/app/lib/dubu";
 import "./docs.css";
 
 const docGroups = [
@@ -17,10 +18,9 @@ const docGroups = [
     title: "Trading",
     items: [
       ["Quotes & pricing", "execution-details"],
-      ["Price impact", "execution-details"],
+      ["Routes", "execution-details"],
       ["Slippage", "execution-details"],
       ["Limit orders", "execution-details"],
-      ["TWAP orders", "execution-details"],
     ],
   },
   {
@@ -32,11 +32,11 @@ const docGroups = [
     ],
   },
   {
-    title: "Developers",
+    title: "Network",
     items: [
-      ["API overview", "api"],
-      ["Quote endpoint", "api"],
-      ["Contract addresses", "api"],
+      ["Network details", "network"],
+      ["Supported assets", "network"],
+      ["Contract addresses", "network"],
     ],
   },
 ] as const;
@@ -46,6 +46,7 @@ const toc = [
   ["Core principles", "principles"],
   ["How a swap works", "how-swaps-work"],
   ["Execution details", "execution-details"],
+  ["Network", "network"],
   ["Next steps", "next-steps"],
 ] as const;
 
@@ -54,7 +55,6 @@ export default function DocsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [docsMenuOpen, setDocsMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [copied, setCopied] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -71,17 +71,6 @@ export default function DocsPage() {
       }))
       .filter((group) => group.items.length > 0);
   }, [search]);
-
-  function copyExample() {
-    void navigator.clipboard.writeText(`const quote = await dubu.quote({
-  chainId: 91342,
-  sellToken: "ETH",
-  buyToken: "USDC",
-  sellAmount: "1000000000000000000"
-});`);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
 
   return (
     <main className={isDark ? "docs-site docs-dark" : "docs-site"}>
@@ -120,12 +109,6 @@ export default function DocsPage() {
         </div>
       </header>
 
-      <div className="docs-announcement">
-        <span>New</span>
-        <p>Dubu documentation is in preview. Examples and endpoints may change before mainnet release.</p>
-        <Link href="#api">View API overview <b>→</b></Link>
-      </div>
-
       <div className="docs-layout">
         <aside ref={sidebarRef} className={docsMenuOpen ? "docs-sidebar open" : "docs-sidebar"}>
           <div className="docs-search">
@@ -158,11 +141,6 @@ export default function DocsPage() {
             {filteredGroups.length === 0 && <p className="docs-search-empty">No matching pages.</p>}
           </nav>
 
-          <div className="docs-sidebar-help">
-            <img src="/assets/character.png" alt="" />
-            <div><strong>Need help?</strong><span>Join the community</span></div>
-            <b>↗</b>
-          </div>
         </aside>
         {docsMenuOpen && <button className="docs-sidebar-scrim" type="button" aria-label="Close documentation navigation" onClick={() => setDocsMenuOpen(false)} />}
 
@@ -178,9 +156,7 @@ export default function DocsPage() {
             <h1>Meet Dubu.</h1>
             <p>A calm, non-custodial interface for aggregated trading and wallet portfolio tracking.</p>
             <div className="docs-meta">
-              <span>Last updated Jul 27, 2026</span>
-              <span>·</span>
-              <span>6 min read</span>
+              <span>Last updated Jul 28, 2026</span>
             </div>
           </section>
 
@@ -192,7 +168,7 @@ export default function DocsPage() {
             </p>
             <p>
               Trades remain non-custodial. Your wallet signs every approval and transaction, while Dubu presents
-              the expected output, network cost, price impact, and minimum received before confirmation.
+              the expected output, rate, route, and minimum received before confirmation.
             </p>
 
             <div className="docs-callout">
@@ -220,8 +196,8 @@ export default function DocsPage() {
               </article>
               <article>
                 <span>03</span>
-                <h3>Useful defaults</h3>
-                <p>Slippage and price protection start in automatic mode but remain adjustable.</p>
+                <h3>Price protection</h3>
+                <p>The selected slippage tolerance sets the minimum amount received.</p>
               </article>
             </div>
           </section>
@@ -231,8 +207,8 @@ export default function DocsPage() {
             <p>A standard swap moves through a short sequence before it reaches the wallet.</p>
             <ol className="docs-steps">
               <li><span>1</span><div><strong>Select tokens</strong><p>Choose the asset to pay and the asset to receive.</p></div></li>
-              <li><span>2</span><div><strong>Request a quote</strong><p>Enter an amount. The interface calculates an estimated output and execution cost.</p></div></li>
-              <li><span>3</span><div><strong>Review details</strong><p>Check price impact, slippage, minimum received, and execution source.</p></div></li>
+              <li><span>2</span><div><strong>Request a quote</strong><p>Enter an amount to see the current expected output.</p></div></li>
+              <li><span>3</span><div><strong>Review details</strong><p>Check the rate, route, slippage, and minimum received.</p></div></li>
               <li><span>4</span><div><strong>Confirm in wallet</strong><p>Approve the token when required, then sign the final transaction.</p></div></li>
             </ol>
           </section>
@@ -240,37 +216,32 @@ export default function DocsPage() {
           <section className="docs-section" id="execution-details">
             <h2>Execution details</h2>
             <p>
-              Quotes can change between preview and wallet confirmation. Dubu refreshes rates automatically and
+              Quotes can change before wallet confirmation. Dubu refreshes rates automatically and
               applies the selected slippage tolerance to calculate the minimum output.
             </p>
             <div className="docs-definition-list">
-              <div><dt>Price impact</dt><dd>The effect your own trade size has on the market price.</dd></div>
+              <div><dt>Rate</dt><dd>The current exchange rate for the selected pair and amount.</dd></div>
+              <div><dt>Route</dt><dd>The liquidity source used for execution.</dd></div>
               <div><dt>Max slippage</dt><dd>The maximum acceptable movement between quote and execution.</dd></div>
-              <div><dt>Network cost</dt><dd>The estimated cost paid to validators for processing the transaction.</dd></div>
               <div><dt>Minimum received</dt><dd>The lowest output allowed before the transaction reverts.</dd></div>
             </div>
           </section>
 
-          <section className="docs-section docs-api-preview" id="api">
+          <section className="docs-section docs-network-card" id="network">
             <div className="docs-section-heading">
               <div>
-                <span>FOR DEVELOPERS</span>
-                <h2>Request a quote</h2>
+                <span>NETWORK</span>
+                <h2>GIWA Sepolia</h2>
               </div>
-              <Link href="#api">API reference →</Link>
             </div>
-            <p>Use the quote client to preview output amounts and transaction parameters.</p>
-            <div className="docs-code-block">
-              <div className="docs-code-head">
-                <span>TypeScript</span>
-                <button type="button" onClick={copyExample}>{copied ? "Copied ✓" : "Copy"}</button>
-              </div>
-              <pre><code><span className="code-purple">const</span> quote = <span className="code-purple">await</span> dubu.quote({`{\n`}
-  chainId: <span className="code-gold">91342</span>,{`\n`}
-  sellToken: <span className="code-green">&quot;ETH&quot;</span>,{`\n`}
-  buyToken: <span className="code-green">&quot;USDC&quot;</span>,{`\n`}
-  sellAmount: <span className="code-green">&quot;1000000000000000000&quot;</span>{`\n`}
-{`}`});</code></pre>
+            <p>Dubu is available on GIWA Sepolia. ETH is used for network fees.</p>
+            <div className="docs-definition-list">
+              <div><dt>Chain ID</dt><dd>91342</dd></div>
+              <div><dt>Supported markets</dt><dd>mWETH / mUSDC · mWBTC / mUSDC</dd></div>
+              <div><dt>mUSDC</dt><dd><code>{TOKENS.mUSDC.address}</code></dd></div>
+              <div><dt>mWETH</dt><dd><code>{TOKENS.mWETH.address}</code></dd></div>
+              <div><dt>mWBTC</dt><dd><code>{TOKENS.mWBTC.address}</code></dd></div>
+              <div><dt>Router</dt><dd><code>{CONTRACTS.router}</code></dd></div>
             </div>
           </section>
 
@@ -282,10 +253,6 @@ export default function DocsPage() {
             </div>
           </section>
 
-          <footer className="docs-article-footer">
-            <span>Was this page helpful?</span>
-            <div><button type="button">Yes</button><button type="button">No</button></div>
-          </footer>
         </article>
 
         <aside className="docs-toc">
@@ -293,9 +260,6 @@ export default function DocsPage() {
           <nav>
             {toc.map(([label, href]) => <a key={href} href={`#${href}`}>{label}</a>)}
           </nav>
-          <div className="docs-toc-divider" />
-          <a href="#">Edit this page ↗</a>
-          <a href="#">Report an issue ↗</a>
         </aside>
       </div>
     </main>

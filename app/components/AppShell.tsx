@@ -372,8 +372,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <h2 id="wallet-title">{address && chainId !== GIWA_CHAIN_ID ? "Switch to GIWA" : "Connect a wallet"}</h2>
               <p>
                 {address && chainId !== GIWA_CHAIN_ID
-                  ? "Dubu operates on GIWA Sepolia. Switch networks to continue."
-                  : "Choose a browser wallet to continue. Dubu never takes custody of your assets."}
+                  ? "Switch networks to continue."
+                  : "Connect with your preferred wallet."}
               </p>
               {address && chainId !== GIWA_CHAIN_ID ? (
                 <button className="wallet-provider-button" type="button" onClick={() => void switchToGiwa()}>
@@ -411,7 +411,7 @@ export function TokenIcon({ symbol }: { symbol: string }) {
   };
 
   if (imageMap[symbol]) {
-    return <img className="token-icon" src={imageMap[symbol]} alt="" />;
+    return <img className={`token-icon token-icon-${symbol.toLowerCase()}`} src={imageMap[symbol]} alt="" />;
   }
 
   const compact = symbol.slice(0, 2).toUpperCase();

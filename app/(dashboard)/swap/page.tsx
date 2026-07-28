@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, TokenIcon, useAppWallet } from "@/app/components/AppShell";
 import {
-  AGGREGATOR,
   CONTRACTS,
   EXPLORER,
-  PAIR_IDS,
   TOKENS,
   TOKEN_LIST,
   allowance,
@@ -16,25 +14,10 @@ import {
   fromBaseUnits,
   hasMarket,
   isQuoteError,
-  poolStatus,
   toBaseUnits,
   type Quote,
   type TokenSymbol,
 } from "@/app/lib/dubu";
-
-/**
- * The swap surface, wired to the live deployment.
- *
- * Every number here comes from somewhere real: the output from the aggregator, which prices the
- * prop AMM and the UniV2 pool on chain and asks the RFQ maker for a signed order; balances and the
- * allowance straight from the token contracts; the pool's remaining depth from
- * `effectiveCapacity`.
- *
- * The venue breakdown is always visible rather than hidden behind a details toggle. DuBu owns both
- * the router and one of the venues it routes to, which is exactly the arrangement people are right
- * to be suspicious of — so what each venue independently offered sits next to what was chosen, and
- * anyone can check the router did not favour its own book.
- */
 
 // How often the displayed quote is re-fetched.
 //
@@ -60,6 +43,25 @@ function provider(): EthereumProvider | undefined {
 
 type Stage = "idle" | "quoting" | "approving" | "swapping";
 
+function quoteErrorMessage(reason = "") {
+  const normalized = reason.toLowerCase();
+  if (normalized.includes("market") || normalized.includes("pair")) {
+    return "This pair is not available.";
+  }
+  if (normalized.includes("amount") || normalized.includes("liquidity")) {
+    return "Try a different amount.";
+  }
+  return "A quote isn’t available right now.";
+}
+
+function walletErrorMessage(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("reject") || message.includes("denied") || message.includes("cancel")) {
+    return "Request cancelled.";
+  }
+  return fallback;
+}
+
 export default function SwapPage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
 
@@ -68,13 +70,13 @@ export default function SwapPage() {
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
   const [pickerSide, setPickerSide] = useState<"from" | "to" | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [balances, setBalances] = useState<Partial<Record<TokenSymbol, bigint>>>({});
   const [approved, setApproved] = useState<bigint>(0n);
-  const [pool, setPool] = useState<Awaited<ReturnType<typeof poolStatus>>>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +84,31 @@ export default function SwapPage() {
   const outInfo = TOKENS[toToken];
   const amountIn = useMemo(() => toBaseUnits(amount, inInfo.decimals), [amount, inInfo.decimals]);
   const marketExists = hasMarket(fromToken, toToken);
+
+  useEffect(() => {
+    if (!pickerSide) return;
+
+    const closePicker = (event: PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) setPickerSide(null);
+    };
+
+    document.addEventListener("pointerdown", closePicker);
+    return () => document.removeEventListener("pointerdown", closePicker);
+  }, [pickerSide]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("dubu-trade-settings") ?? "{}") as {
+        slippage?: string;
+      };
+      const nextSlippage = Number(saved.slippage);
+      if (Number.isFinite(nextSlippage) && nextSlippage > 0 && nextSlippage <= 50) {
+        setSlippageBps(Math.round(nextSlippage * 100));
+      }
+    } catch {
+      // Keep the default when stored preferences are invalid.
+    }
+  }, []);
 
   // --- balances and allowance -------------------------------------------------------------
   const refreshAccount = useCallback(async () => {
@@ -101,26 +128,6 @@ export default function SwapPage() {
   useEffect(() => {
     void refreshAccount();
   }, [refreshAccount]);
-
-  // --- the pool's own state, which is the interesting half of "why this price" -------------
-  useEffect(() => {
-    const base = fromToken === "mUSDC" ? toToken : fromToken;
-    const pairId = PAIR_IDS[base];
-    if (!pairId) {
-      setPool(null);
-      return;
-    }
-    let alive = true;
-    const tick = () => void poolStatus(pairId).then((p) => alive && setPool(p));
-    tick();
-    // 2s. The pool re-quotes every ~590ms and its capacity starts fading at 30s, so a 5s poll could
-    // show a quote as 5s older than it was and, on the fade ramp, a capacity that had already moved.
-    const id = setInterval(tick, 2_000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [fromToken, toToken]);
 
   // --- quoting ----------------------------------------------------------------------------
   const abort = useRef<AbortController | null>(null);
@@ -150,7 +157,7 @@ export default function SwapPage() {
       if (controller.signal.aborted) return;
       if (isQuoteError(result)) {
         setQuote(null);
-        setQuoteError(result.detail ? `${result.error} — ${result.detail}` : result.error);
+        setQuoteError(quoteErrorMessage(`${result.error} ${result.detail ?? ""}`));
       } else {
         setQuote(result);
         setQuoteError(null);
@@ -158,7 +165,7 @@ export default function SwapPage() {
     } catch (e) {
       if (!controller.signal.aborted) {
         setQuote(null);
-        setQuoteError(e instanceof Error ? e.message : "could not reach the aggregator");
+        setQuoteError(quoteErrorMessage(e instanceof Error ? e.message : ""));
       }
     } finally {
       if (!controller.signal.aborted) setStage("idle");
@@ -201,7 +208,7 @@ export default function SwapPage() {
       // The wallet returns as soon as the node accepts it; the allowance changes a block later.
       setTimeout(() => void refreshAccount(), 2_500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "approval rejected");
+      setError(walletErrorMessage(e, "Approval wasn’t completed."));
     } finally {
       setStage("idle");
     }
@@ -230,16 +237,11 @@ export default function SwapPage() {
         slippageBps,
       });
       if (isQuoteError(fresh)) {
-        setError(fresh.detail ? `${fresh.error} — ${fresh.detail}` : fresh.error);
+        setError(quoteErrorMessage(`${fresh.error} ${fresh.detail ?? ""}`));
         return;
       }
       if (BigInt(fresh.amountOut) < BigInt(quote.minAmountOut)) {
-        setError(
-          `price moved past your slippage while you were deciding — ` +
-            `${fromBaseUnits(BigInt(fresh.amountOut), outInfo.decimals, 6)} ${outInfo.symbol} now, ` +
-            `you were shown a minimum of ${fromBaseUnits(BigInt(quote.minAmountOut), outInfo.decimals, 6)}. ` +
-            `Nothing was sent.`,
-        );
+        setError("Price moved beyond your minimum. Review the updated quote and try again.");
         return;
       }
       setQuote(fresh);
@@ -249,7 +251,7 @@ export default function SwapPage() {
       setQuote(null);
       setTimeout(() => void refreshAccount(), 2_500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "transaction rejected");
+      setError(walletErrorMessage(e, "Swap wasn’t completed."));
     } finally {
       setStage("idle");
     }
@@ -273,6 +275,54 @@ export default function SwapPage() {
     setQuote(null);
   };
 
+  const tokenDropdown = (side: "from" | "to") => {
+    if (pickerSide !== side) return null;
+    const other = side === "from" ? toToken : fromToken;
+
+    return (
+      <div className="dubu-token-dropdown" role="listbox" aria-label={`Select ${side} token`}>
+        <div className="dubu-token-dropdown-head">
+          <strong>Select token</strong>
+          <span>GIWA Sepolia</span>
+        </div>
+        {TOKEN_LIST.map((token) => {
+          const unavailable = token.symbol !== other && !hasMarket(token.symbol, other);
+          const selected = token.symbol === (side === "from" ? fromToken : toToken);
+          return (
+            <button
+              key={token.symbol}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              disabled={token.symbol === other || unavailable}
+              onClick={() => {
+                if (side === "from") setFromToken(token.symbol);
+                else setToToken(token.symbol);
+                setPickerSide(null);
+                setQuote(null);
+              }}
+            >
+              <TokenIcon symbol={token.symbol} />
+              <span>
+                <strong>{token.symbol}</strong>
+                <small>{token.name}</small>
+              </span>
+              <b>
+                {unavailable
+                  ? "No market"
+                  : connected
+                    ? fromBaseUnits(balances[token.symbol] ?? 0n, token.decimals, 4)
+                    : selected
+                      ? "Selected"
+                      : ""}
+              </b>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   // --- derived ----------------------------------------------------------------------------
   const outAmount = quote ? fromBaseUnits(BigInt(quote.amountOut), outInfo.decimals) : "";
   const needsApproval = quote !== null && approved < amountIn;
@@ -291,56 +341,33 @@ export default function SwapPage() {
 
   const venues = useMemo(() => {
     if (!quote) return [];
-    const d = quote.detail;
-    const best = BigInt(quote.amountOut);
     const rows = [
       {
         key: "prop",
-        label: "DuBu Prop AMM",
-        out: BigInt(d.prop || "0"),
-        note: "oracle-priced ladder",
-        chosen: quote.route.venues.includes("prop"),
+        label: "Dubu",
+        source: "AMM",
+        out: BigInt(quote.detail.prop || "0"),
       },
       {
         key: "univ2",
-        label: "UniswapV2",
-        out: BigInt(d.univ2 || "0"),
-        note: "constant product, 30bp fee",
-        chosen: quote.route.venues.includes("univ2"),
+        label: "Uniswap V2",
+        source: "Liquidity pool",
+        out: BigInt(quote.detail.univ2 || "0"),
       },
       {
         key: "rfq",
-        label: "DuBu RFQ",
-        out: d.rfq ? BigInt(d.rfq) : 0n,
-        note: d.rfq
-          ? "signed quote, priced on request"
-          : d.rfqMakerReason
-            ? `declined — ${d.rfqMakerReason}`
-            : `unavailable — ${d.rfqRejected ?? "off"}`,
-        chosen: quote.route.venues.includes("rfq"),
+        label: "Dubu RFQ",
+        source: "Market maker",
+        out: quote.detail.rfq ? BigInt(quote.detail.rfq) : 0n,
       },
     ];
-    return rows.map((r) => ({
-      ...r,
-      display: r.out > 0n ? fromBaseUnits(r.out, outInfo.decimals) : null,
-      deltaBps: r.out > 0n && best > 0n ? Number(((r.out - best) * 10_000n) / best) : null,
+
+    return rows.map((venue) => ({
+      ...venue,
+      chosen: quote.route.venues.includes(venue.key),
+      display: venue.out > 0n ? fromBaseUnits(venue.out, outInfo.decimals) : null,
     }));
   }, [quote, outInfo.decimals]);
-
-  const capacity = useMemo(() => {
-    if (!pool) return null;
-    const base = fromToken === "mUSDC" ? toToken : fromToken;
-    const selling = fromToken === "mUSDC";
-    const cap = selling ? pool.askCapacity : pool.bidCapacity;
-    return {
-      side: selling ? "can sell" : "can buy",
-      amount: fromBaseUnits(cap, TOKENS[base].decimals, 2),
-      symbol: base,
-      age: pool.ageSecs,
-      decay: pool.decaySecs,
-      dying: pool.decaySecs > 0 && pool.ageSecs > pool.decaySecs / 2,
-    };
-  }, [pool, fromToken, toToken]);
 
   const primary = (() => {
     if (!connected) return { label: "Connect wallet", action: openWallet, disabled: false };
@@ -371,10 +398,6 @@ export default function SwapPage() {
         <div className="trade-heading">
           <div>
             <h1>Swap</h1>
-            <p>
-              Routed across the DuBu prop AMM, its RFQ maker, and UniswapV2 on GIWA Sepolia. Every
-              venue&rsquo;s independent quote is shown below.
-            </p>
           </div>
         </div>
 
@@ -389,15 +412,20 @@ export default function SwapPage() {
               )}
             </div>
             <div className="dex-field-main">
-              <button
-                className="dex-token-button"
-                type="button"
-                onClick={() => setPickerSide("from")}
-              >
-                <TokenIcon symbol={fromToken} />
-                <span>{fromToken}</span>
-                <span aria-hidden>▾</span>
-              </button>
+              <div className="swap-token-dropdown-wrap" ref={pickerSide === "from" ? pickerRef : undefined}>
+                <button
+                  className="dex-token-button"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={pickerSide === "from"}
+                  onClick={() => setPickerSide((current) => current === "from" ? null : "from")}
+                >
+                  <TokenIcon symbol={fromToken} />
+                  <span>{fromToken}</span>
+                  <span aria-hidden>▾</span>
+                </button>
+                {tokenDropdown("from")}
+              </div>
               <input
                 inputMode="decimal"
                 placeholder="0"
@@ -437,16 +465,29 @@ export default function SwapPage() {
             <div className="dex-field-label">
               <span>You receive</span>
               {quote && (
-                <span>min {fromBaseUnits(BigInt(quote.minAmountOut), outInfo.decimals, 4)}</span>
+                <span key={quote.minAmountOut} className="swap-price-updated">
+                  min {fromBaseUnits(BigInt(quote.minAmountOut), outInfo.decimals, 4)}
+                </span>
               )}
             </div>
             <div className="dex-field-main">
-              <button className="dex-token-button" type="button" onClick={() => setPickerSide("to")}>
-                <TokenIcon symbol={toToken} />
-                <span>{toToken}</span>
-                <span aria-hidden>▾</span>
-              </button>
+              <div className="swap-token-dropdown-wrap" ref={pickerSide === "to" ? pickerRef : undefined}>
+                <button
+                  className="dex-token-button"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={pickerSide === "to"}
+                  onClick={() => setPickerSide((current) => current === "to" ? null : "to")}
+                >
+                  <TokenIcon symbol={toToken} />
+                  <span>{toToken}</span>
+                  <span aria-hidden>▾</span>
+                </button>
+                {tokenDropdown("to")}
+              </div>
               <input
+                key={quote?.amountOut ?? "empty"}
+                className={quote ? "swap-price-updated" : ""}
                 readOnly
                 placeholder="0"
                 value={outAmount}
@@ -456,7 +497,7 @@ export default function SwapPage() {
             <div className="dex-field-fiat">
               <span>{outInfo.name}</span>
               {price !== null && (
-                <span>
+                <span key={quote?.amountOut} className="swap-price-updated">
                   1 {fromToken} ≈{" "}
                   {price.toLocaleString("en-US", { maximumSignificantDigits: 6 })} {toToken}
                 </span>
@@ -467,60 +508,36 @@ export default function SwapPage() {
           {quote && (
             <div className="dubu-venues">
               <div className="dubu-venues-head">
-                <span>Where this price came from</span>
-                {quote.detail.split && <span className="dubu-badge">split route</span>}
+                <span>Route</span>
+                {quote.detail.split && <span className="dubu-badge">Split</span>}
               </div>
-              {venues.map((v) => (
-                <div key={v.key} className={`dubu-venue-row${v.chosen ? " chosen" : ""}`}>
+              {venues.map((venue) => (
+                <div key={venue.key} className={`dubu-venue-row${venue.chosen ? " chosen" : ""}`}>
                   <div className="dubu-venue-name">
-                    <strong>{v.label}</strong>
-                    <small>{v.note}</small>
+                    <strong>{venue.label}</strong>
+                    <small>{venue.source}</small>
                   </div>
                   <div className="dubu-venue-out">
-                    {v.display ? (
+                    {venue.display ? (
                       <>
-                        <span>{v.display}</span>
-                        {v.deltaBps !== null && v.deltaBps !== 0 && (
-                          <small className={v.deltaBps > 0 ? "up" : "down"}>
-                            {v.deltaBps > 0 ? "+" : ""}
-                            {v.deltaBps} bp
-                          </small>
-                        )}
+                        <span key={`${venue.key}-${venue.display}`} className="swap-price-updated">
+                          {venue.display}
+                        </span>
+                        {venue.chosen && <small className="up">Selected</small>}
                       </>
                     ) : (
-                      <span className="muted">—</span>
+                      <span className="muted">Not available</span>
                     )}
                   </div>
                 </div>
               ))}
-              {quote.detail.split && (
-                <div className="dubu-split">
-                  {quote.detail.legs.map((l) => (
-                    <span key={l.venue}>
-                      {l.venue} {(l.weightBps / 100).toFixed(0)}%
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {capacity && (
-            <div className="dubu-pool">
-              <span>
-                Pool {capacity.side} {capacity.amount} {capacity.symbol}
-              </span>
-              <span className={capacity.dying ? "warn" : ""}>
-                quote {capacity.age}s old
-                {capacity.decay > 0 && ` · fades at ${capacity.decay}s`}
-              </span>
             </div>
           )}
 
           <div className="dubu-slippage">
             <span>Max slippage</span>
             <div>
-              {[10, 50, 100].map((bps) => (
+              {(![10, 50, 100].includes(slippageBps) ? [slippageBps, 10, 50, 100] : [10, 50, 100]).map((bps) => (
                 <button
                   key={bps}
                   type="button"
@@ -556,62 +573,8 @@ export default function SwapPage() {
             </a>
           )}
 
-          <p className="dubu-footnote">
-            Quotes from <code>{AGGREGATOR.replace(/^https?:\/\//, "")}</code>. It holds no keys and
-            takes no custody — it returns calldata your wallet signs, and the minimum received is
-            inside what you sign.
-          </p>
         </Panel>
       </div>
-
-      {pickerSide && (
-        <div
-          className="dubu-picker-backdrop"
-          onClick={() => setPickerSide(null)}
-          role="presentation"
-        >
-          <div
-            className="dubu-picker"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Select token"
-          >
-            <h3>Select a token</h3>
-            {TOKEN_LIST.map((t) => {
-              const other = pickerSide === "from" ? toToken : fromToken;
-              const unavailable = t.symbol !== other && !hasMarket(t.symbol, other);
-              return (
-                <button
-                  key={t.symbol}
-                  type="button"
-                  disabled={t.symbol === other || unavailable}
-                  onClick={() => {
-                    if (pickerSide === "from") setFromToken(t.symbol);
-                    else setToToken(t.symbol);
-                    setPickerSide(null);
-                    setQuote(null);
-                  }}
-                >
-                  <TokenIcon symbol={t.symbol} />
-                  <div>
-                    <strong>{t.symbol}</strong>
-                    <small>
-                      {t.name} · tracks {t.tracks}
-                    </small>
-                  </div>
-                  <span className="muted">
-                    {unavailable
-                      ? "no market"
-                      : connected
-                        ? fromBaseUnits(balances[t.symbol] ?? 0n, t.decimals, 4)
-                        : ""}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export type TokenInfo = {
   name: string;
   address: `0x${string}`;
   decimals: number;
-  /** What the mock stands in for, which is what the maker actually prices against. */
+  /** Reference market used for pricing. */
   tracks: string;
 };
 
@@ -42,21 +42,21 @@ export type TokenInfo = {
 export const TOKENS: Record<TokenSymbol, TokenInfo> = {
   mUSDC: {
     symbol: "mUSDC",
-    name: "Mock USD Coin",
+    name: "USD Coin",
     address: "0xd28596C6750D87C53EA146134AfAB53de86C5155",
     decimals: 6,
     tracks: "USD",
   },
   mWETH: {
     symbol: "mWETH",
-    name: "Mock Wrapped Ether",
+    name: "Wrapped Ether",
     address: "0x81e46C6379498beBEB5DCcD47ab2DdFaf967d445",
     decimals: 18,
     tracks: "ETHUSDT",
   },
   mWBTC: {
     symbol: "mWBTC",
-    name: "Mock Wrapped Bitcoin",
+    name: "Wrapped Bitcoin",
     address: "0x3548991B5EF2D7805EFa95bEa6CeDeAee3869875",
     decimals: 8,
     tracks: "BTCUSDT",

@@ -10,13 +10,13 @@ const features = [
   },
   {
     icon: "↘",
-    title: "More stays in your wallet",
-    body: "Clear price impact, minimum received, and network cost before every trade.",
+    title: "Clear trade details",
+    body: "Review the rate, route, and minimum received before you confirm.",
   },
   {
     icon: "◇",
     title: "Aggregated execution",
-    body: "Dubu compares executable quotes to surface a stronger price for each trade.",
+    body: "Dubu evaluates supported liquidity sources for each quote.",
   },
   {
     icon: "⌁",
@@ -26,10 +26,10 @@ const features = [
 ];
 
 const stats = [
-  ["1 sec", "GIWA block time"],
+  ["91342", "Chain ID"],
   ["EVM", "Compatible"],
   ["ETH", "Gas token"],
-  ["100%", "Non-custodial"],
+  ["GIWA", "Sepolia"],
 ];
 
 const routes = [
@@ -41,7 +41,6 @@ const routes = [
 export default function Home() {
   const [isDark, setIsDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("Swap");
   const [fromToken, setFromToken] = useState<"ETH" | "USDC">("ETH");
   const [amount, setAmount] = useState("");
 
@@ -131,20 +130,8 @@ export default function Home() {
           <div className="swap-card">
             <div className="swap-header">
               <div className="tabs" role="tablist" aria-label="Order type">
-                {["Swap", "Limit", "TWAP"].map((tab) => (
-                  <button
-                    key={tab}
-                    className={activeTab === tab ? "active" : ""}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === tab}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
+                <button className="active" type="button" role="tab" aria-selected="true">Swap</button>
               </div>
-              <button className="settings" type="button" aria-label="Swap settings">⚙</button>
             </div>
 
             <div className="token-box">
@@ -212,7 +199,7 @@ export default function Home() {
                 </>
               )}
               <a className={`swap-button ${Number(amount) > 0 ? "" : "disabled"}`} href="/swap">
-                {Number(amount) > 0 ? `Review ${activeTab.toLowerCase()} in app` : "Enter an amount"}
+                {Number(amount) > 0 ? "Review swap in app" : "Enter an amount"}
               </a>
             </div>
             <div className="powered">Rates refresh automatically before confirmation.</div>
@@ -331,9 +318,9 @@ export default function Home() {
         <p>Best price. Every time.</p>
         <div className="footer-links">
           <a href="/swap">App</a>
-          <a href="/analytics">Analytics</a>
+          <a href="/trade">Trade</a>
+          <a href="/portfolio">Portfolio</a>
           <a href="/docs">Docs</a>
-          <a href="#about">X / Twitter</a>
         </div>
         <small>© 2026 Dubu Labs. Non-custodial by design.</small>
       </footer>

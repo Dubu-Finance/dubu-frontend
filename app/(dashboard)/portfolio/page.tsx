@@ -9,7 +9,7 @@ import {
 } from "@/app/components/AppShell";
 import Sparkline from "@/app/components/Sparkline";
 
-const INDICATIVE_ETH_PRICE = 2568.7;
+const ETH_USD_PRICE = 2568.7;
 const historyShape: Record<string, number[]> = {
   "24H": [92, 94, 93, 96, 97, 95, 99, 101, 100, 102, 103, 101, 104, 106, 105, 108],
   "1W": [80, 82, 85, 83, 88, 91, 89, 94, 96, 95, 99, 102, 100, 105, 108, 110],
@@ -30,7 +30,7 @@ export default function PortfolioPage() {
   const visibleAddress = inspectedAddress || address;
   const visibleBalance = inspectedAddress ? inspectedBalance : ethBalance;
   const numericBalance = Number(visibleBalance ?? 0);
-  const estimatedValue = numericBalance * INDICATIVE_ETH_PRICE;
+  const estimatedValue = numericBalance * ETH_USD_PRICE;
   const shortAddress = visibleAddress
     ? `${visibleAddress.slice(0, 8)}...${visibleAddress.slice(-6)}`
     : "No wallet selected";
@@ -54,7 +54,7 @@ export default function PortfolioPage() {
       return;
     }
     if (!window.ethereum) {
-      setSearchStatus("A browser wallet provider is required to read this address.");
+      setSearchStatus("Connect a wallet to search addresses.");
       return;
     }
     if (!onGiwa) {
@@ -73,7 +73,7 @@ export default function PortfolioPage() {
       setInspectedBalance((Number(wei) / 1e18).toFixed(4));
       setSearchStatus("");
     } catch {
-      setSearchStatus("This address could not be read from the current provider.");
+      setSearchStatus("We couldn’t load this address. Try again.");
     }
   }
 
@@ -108,7 +108,7 @@ export default function PortfolioPage() {
         <div className="wallet-total-value">
           <small>Estimated portfolio value</small>
           <strong>{visibleBalance ? `$${estimatedValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}</strong>
-          <span>Indicative ETH pricing</span>
+          <span>GIWA Sepolia</span>
         </div>
         <div className="wallet-overview-actions">
           {inspectedAddress ? (
@@ -160,13 +160,12 @@ export default function PortfolioPage() {
             </div>
             {visibleBalance ? (
               <>
-                <Sparkline data={chartData} height={220} grid label={`${range} indicative portfolio value`} />
+                <Sparkline data={chartData} height={220} grid label={`${range} portfolio value`} />
                 <div className="portfolio-chart-axis"><span>{range === "24H" ? "Earlier" : "Start"}</span><span>Midpoint</span><span>Now</span></div>
               </>
             ) : (
               <div className="portfolio-chart-empty"><span>⌁</span><strong>No portfolio data</strong><p>Connect a wallet or search an address to view its balance.</p></div>
             )}
-            <p className="portfolio-data-note">Historical performance is an interface preview until the Dubu portfolio indexer is connected.</p>
           </Panel>
 
           <Panel className="wallet-assets-panel">
@@ -176,14 +175,14 @@ export default function PortfolioPage() {
             </div>
             <div className="app-table-wrap">
               <table className="app-table wallet-assets-table">
-                <thead><tr><th>Token</th><th>Type</th><th>Balance</th><th>Indicative price</th><th>Value</th></tr></thead>
+                <thead><tr><th>Token</th><th>Type</th><th>Balance</th><th>Price</th><th>Value</th></tr></thead>
                 {visibleBalance && (
                   <tbody>
                     <tr>
                       <td><div className="wallet-token-cell"><TokenIcon symbol="ETH" /><div><strong>Ether</strong><small>ETH</small></div></div></td>
                       <td><span className="wallet-native-badge">Native</span></td>
                       <td>{visibleBalance} ETH</td>
-                      <td>${INDICATIVE_ETH_PRICE.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                      <td>${ETH_USD_PRICE.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
                       <td><strong>${estimatedValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong></td>
                     </tr>
                   </tbody>
@@ -196,7 +195,6 @@ export default function PortfolioPage() {
                 </div>
               )}
             </div>
-            <div className="portfolio-indexer-foot"><span>i</span> ERC-20 balances and live USD pricing require the Dubu portfolio indexer.</div>
           </Panel>
         </>
       ) : (

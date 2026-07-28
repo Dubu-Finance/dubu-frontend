@@ -8,7 +8,7 @@ import {
   useAppWallet,
 } from "@/app/components/AppShell";
 
-type PairKey = "ETH/USDC" | "WBTC/USDC" | "ETH/USDT";
+type PairKey = "mWETH/mUSDC" | "mWBTC/mUSDC";
 type OrderMode = "Market" | "Limit";
 type OrderTab = "Active" | "History";
 
@@ -20,9 +20,8 @@ const pairs: Record<PairKey, {
   high: number;
   low: number;
 }> = {
-  "ETH/USDC": { base: "ETH", quote: "USDC", price: 2568.7, change: 1.84, high: 2627.4, low: 2491.2 },
-  "WBTC/USDC": { base: "WBTC", quote: "USDC", price: 68032, change: -0.72, high: 69280, low: 67108 },
-  "ETH/USDT": { base: "ETH", quote: "USDT", price: 2567.2, change: 1.79, high: 2625.8, low: 2489.6 },
+  "mWETH/mUSDC": { base: "mWETH", quote: "mUSDC", price: 2568.7, change: 1.84, high: 2627.4, low: 2491.2 },
+  "mWBTC/mUSDC": { base: "mWBTC", quote: "mUSDC", price: 68032, change: -0.72, high: 69280, low: 67108 },
 };
 
 const pairKeys = Object.keys(pairs) as PairKey[];
@@ -55,7 +54,7 @@ function formatPrice(value: number) {
 
 export default function TradePage() {
   const { connected, onGiwa, openWallet, switchToGiwa } = useAppWallet();
-  const [pairKey, setPairKey] = useState<PairKey>("ETH/USDC");
+  const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
   const [interval, setInterval] = useState("15m");
   const [mode, setMode] = useState<OrderMode>("Market");
   const [side, setSide] = useState<"Buy" | "Sell">("Buy");
@@ -107,7 +106,7 @@ export default function TradePage() {
 
   function submitOrder() {
     setReviewOpen(false);
-    setToast(`${mode} order prepared. Confirm the transaction in your wallet.`);
+    setToast(`${mode} order ready. Confirm in your wallet.`);
     window.setTimeout(() => setToast(""), 3200);
   }
 
@@ -153,11 +152,10 @@ export default function TradePage() {
                   </button>
                 ))}
               </div>
-              <span><i /> Indicative preview</span>
               <button type="button" title="Chart settings" aria-label="Chart settings">⚙</button>
             </div>
 
-            <div className="terminal-chart" aria-label={`${pairKey} indicative candlestick chart`}>
+            <div className="terminal-chart" aria-label={`${pairKey} candlestick chart`}>
               <div className="terminal-grid-lines" aria-hidden="true"><i /><i /><i /><i /></div>
               <div className="terminal-candles">
                 {candles.map((candle, index) => {
@@ -202,7 +200,7 @@ export default function TradePage() {
             <div className="terminal-orders-empty">
               <span>⌁</span>
               <strong>{orderTab === "Active" ? "No active orders" : "No order history"}</strong>
-              <p>{connected ? "Orders submitted through Dubu will appear here." : "Connect your wallet to view your orders."}</p>
+              <p>{connected ? "Your orders will appear here." : "Connect your wallet to view your orders."}</p>
             </div>
           </Panel>
         </section>
@@ -269,7 +267,6 @@ export default function TradePage() {
           <button className="app-primary-button terminal-order-action" type="button" disabled={connected && onGiwa && !hasAmount} onClick={handlePrimaryAction}>
             {actionLabel}
           </button>
-          <p className="terminal-order-note">Quotes and executable routes require the Dubu market data and routing services.</p>
         </Panel>
       </div>
 

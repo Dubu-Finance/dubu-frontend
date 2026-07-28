@@ -1,37 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AppPageHeader,
   Panel,
   SectionTitle,
   Toast,
-  Toggle,
   useAppTheme,
   useAppWallet,
 } from "@/app/components/AppShell";
-
-type ToggleKey = "autoSlippage" | "privateTx" | "multihop" | "hideSmall";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useAppTheme();
   const { connected, address, ethBalance, openWallet, disconnect } = useAppWallet();
   const [slippage, setSlippage] = useState("0.50");
-  const [deadline, setDeadline] = useState("20");
   const [saved, setSaved] = useState(false);
-  const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
-    autoSlippage: true,
-    privateTx: false,
-    multihop: true,
-    hideSmall: false,
-  });
 
-  function updateToggle(key: ToggleKey, value: boolean) {
-    setToggles((current) => ({ ...current, [key]: value }));
-  }
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("dubu-trade-settings") ?? "{}") as {
+        slippage?: string;
+      };
+      if (stored.slippage) setSlippage(stored.slippage);
+    } catch {
+      // Keep the default when stored preferences are invalid.
+    }
+  }, []);
 
   function saveSettings() {
-    window.localStorage.setItem("dubu-trade-settings", JSON.stringify({ slippage, deadline, toggles }));
+    window.localStorage.setItem("dubu-trade-settings", JSON.stringify({ slippage }));
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2600);
   }
@@ -66,33 +63,24 @@ export default function SettingsPage() {
         <div className="settings-column">
           <Panel className="settings-panel">
             <SectionTitle><span className="settings-title-icon">⇄</span> Transaction settings</SectionTitle>
-            <SettingRow label="Automatic slippage" description="Adjust tolerance based on token liquidity and trade size.">
-              <Toggle checked={toggles.autoSlippage} onChange={(value) => updateToggle("autoSlippage", value)} label="Automatic slippage" />
-            </SettingRow>
             <SettingRow label="Max slippage" description="The transaction reverts if the price moves beyond this value.">
-              <label className={`settings-input ${toggles.autoSlippage ? "disabled" : ""}`}>
-                <input aria-label="Maximum slippage" value={slippage} disabled={toggles.autoSlippage} onChange={(event) => setSlippage(event.target.value.replace(/[^0-9.]/g, ""))} />
-                <span>%</span>
-              </label>
-            </SettingRow>
-            <SettingRow label="Transaction deadline" description="Pending swaps revert after this time.">
               <label className="settings-input">
-                <input aria-label="Transaction deadline" value={deadline} onChange={(event) => setDeadline(event.target.value.replace(/\D/g, ""))} />
-                <span>min</span>
+                <input aria-label="Maximum slippage" value={slippage} onChange={(event) => setSlippage(event.target.value.replace(/[^0-9.]/g, ""))} />
+                <span>%</span>
               </label>
             </SettingRow>
           </Panel>
 
           <Panel className="settings-panel">
-            <SectionTitle><span className="settings-title-icon">⌁</span> Execution</SectionTitle>
-            <SettingRow label="Price protection" description="Reject the swap when execution moves outside your selected tolerance.">
-              <Toggle checked={toggles.multihop} onChange={(value) => updateToggle("multihop", value)} label="Price protection" />
+            <SectionTitle><span className="settings-title-icon">G</span> Network</SectionTitle>
+            <SettingRow label="Network" description="Dubu swaps are available on GIWA Sepolia.">
+              <span className="settings-static-value">GIWA Sepolia</span>
             </SettingRow>
-            <SettingRow label="Private transactions" description="Submit supported swaps through a private RPC to reduce MEV exposure.">
-              <Toggle checked={toggles.privateTx} onChange={(value) => updateToggle("privateTx", value)} label="Private transactions" />
+            <SettingRow label="Chain ID" description="Use this value when adding the network to a wallet.">
+              <span className="settings-static-value">91342</span>
             </SettingRow>
-            <SettingRow label="Quote preference" description="Optimize quotes for received amount after network cost.">
-              <button className="settings-select" type="button">Best net output <b>⌄</b></button>
+            <SettingRow label="Gas token" description="Network fees are paid in ETH.">
+              <span className="settings-static-value">ETH</span>
             </SettingRow>
           </Panel>
         </div>
@@ -107,18 +95,6 @@ export default function SettingsPage() {
                 <button className={theme === "dark" ? "active" : ""} type="button" onClick={() => setTheme("dark")}>☾ Dark</button>
               </div>
             </div>
-            <SettingRow label="Fiat currency" description="Used for estimated token and network cost values.">
-              <button className="settings-select short" type="button">USD <b>⌄</b></button>
-            </SettingRow>
-            <SettingRow label="Hide small balances" description="Hide token balances worth less than $1.">
-              <Toggle checked={toggles.hideSmall} onChange={(value) => updateToggle("hideSmall", value)} label="Hide small balances" />
-            </SettingRow>
-          </Panel>
-
-          <Panel className="settings-panel risk-settings-panel">
-            <SectionTitle><span className="settings-title-icon">!</span> Token safety</SectionTitle>
-            <p>Dubu shows warnings for unknown tokens, high price impact, and fee-on-transfer behavior. Token lists can still contain malicious assets.</p>
-            <button className="settings-text-button" type="button">Manage token lists <span>›</span></button>
           </Panel>
 
           <button className="app-primary-button settings-save" type="button" onClick={saveSettings}>Save preferences</button>

@@ -359,6 +359,11 @@
   font-weight: 800;
 }
 
+.token-icon-wbtc,
+.token-icon-mwbtc {
+  transform: scale(0.78);
+}
+
 .token-weth { background: #202124; }
 .token-usdt { background: #42a891; }
 .token-dai { background: #e8a51f; }
@@ -5280,6 +5285,17 @@
   font-size: 8px;
 }
 
+.terminal-chart-toolbar > button:last-child {
+  margin-left: auto;
+}
+
+.settings-static-value {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .terminal-chart-toolbar > span i {
   width: 6px;
   height: 6px;
@@ -6489,6 +6505,140 @@
   margin: 0 auto;
 }
 
+.swap-token-dropdown-wrap {
+  position: relative;
+  width: 132px;
+  flex: 0 0 auto;
+}
+
+.swap-token-dropdown-wrap > .dex-token-button {
+  width: 100%;
+}
+
+.dubu-token-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 45;
+  width: 290px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: 15px;
+  background: var(--app-surface-solid);
+  box-shadow: 0 20px 55px rgba(48, 33, 19, 0.2);
+  animation: token-dropdown-in 150ms ease-out both;
+}
+
+.dubu-token-dropdown-head {
+  min-height: 35px;
+  padding: 0 8px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--app-line);
+}
+
+.dubu-token-dropdown-head strong {
+  font-size: 10px;
+}
+
+.dubu-token-dropdown-head span {
+  color: var(--app-muted);
+  font-size: 8px;
+}
+
+.dubu-token-dropdown > button {
+  width: 100%;
+  min-height: 55px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--app-text);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dubu-token-dropdown > button:hover:not(:disabled),
+.dubu-token-dropdown > button[aria-selected="true"] {
+  background: var(--app-soft);
+}
+
+.dubu-token-dropdown > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.dubu-token-dropdown > button > span {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.dubu-token-dropdown > button strong {
+  font-size: 11px;
+}
+
+.dubu-token-dropdown > button small,
+.dubu-token-dropdown > button b {
+  color: var(--app-muted);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.dubu-token-dropdown > button b {
+  max-width: 85px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dubu-token-dropdown .token-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.swap-price-updated {
+  animation: swap-price-tick 480ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes token-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes swap-price-tick {
+  0% {
+    opacity: 0.32;
+    color: var(--app-accent-deep);
+    transform: translateY(-4px);
+  }
+
+  55% {
+    opacity: 1;
+    color: var(--app-accent-deep);
+  }
+
+  100% {
+    opacity: 1;
+    color: inherit;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 780px) {
   .swap-centered-page .trade-heading {
     margin-top: 4px;
@@ -6498,16 +6648,20 @@
     max-width: 500px;
     font-size: 10px;
   }
+
+  .dubu-token-dropdown {
+    width: min(290px, calc(100vw - 58px));
+  }
 }
 
-/* ---------------------------------------------------------------------------
-   Routing transparency.
+@media (prefers-reduced-motion: reduce) {
+  .dubu-token-dropdown,
+  .swap-price-updated {
+    animation: none;
+  }
+}
 
-   DuBu owns both the router and one of the venues it routes to, so what each
-   venue independently quoted sits next to what was chosen rather than behind a
-   details toggle. If the router ever prefers its own book against the numbers,
-   this panel is where it shows.
-   --------------------------------------------------------------------------- */
+/* Swap route */
 
 .dubu-venues {
   margin-top: 12px;
