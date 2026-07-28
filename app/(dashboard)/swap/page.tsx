@@ -1,377 +1,564 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Panel, TokenIcon, useAppWallet } from "@/app/components/AppShell";
 import {
-  Panel,
-  SectionTitle,
-  Toast,
-  TokenIcon,
-  useAppWallet,
-} from "@/app/components/AppShell";
-import Sparkline from "@/app/components/Sparkline";
+  AGGREGATOR,
+  CONTRACTS,
+  EXPLORER,
+  PAIR_IDS,
+  TOKENS,
+  TOKEN_LIST,
+  allowance,
+  balanceOf,
+  encodeApprove,
+  fetchQuote,
+  fromBaseUnits,
+  hasMarket,
+  isQuoteError,
+  poolStatus,
+  toBaseUnits,
+  type Quote,
+  type TokenSymbol,
+} from "@/app/lib/dubu";
 
-type TokenSymbol = "ETH" | "USDC" | "USDT" | "DAI" | "WBTC";
-type TradeMode = "Swap" | "Limit" | "TWAP";
+/**
+ * The swap surface, wired to the live deployment.
+ *
+ * Every number here comes from somewhere real: the output from the aggregator, which prices the
+ * prop AMM and the UniV2 pool on chain and asks the RFQ maker for a signed order; balances and the
+ * allowance straight from the token contracts; the pool's remaining depth from
+ * `effectiveCapacity`.
+ *
+ * The venue breakdown is always visible rather than hidden behind a details toggle. DuBu owns both
+ * the router and one of the venues it routes to, which is exactly the arrangement people are right
+ * to be suspicious of — so what each venue independently offered sits next to what was chosen, and
+ * anyone can check the router did not favour its own book.
+ */
 
-const tokens: Record<TokenSymbol, { name: string; price: number; balance: string }> = {
-  ETH: { name: "Ether", price: 2568.7, balance: "—" },
-  USDC: { name: "USD Coin", price: 1, balance: "—" },
-  USDT: { name: "Tether", price: 0.9994, balance: "—" },
-  DAI: { name: "Dai", price: 1.0002, balance: "—" },
-  WBTC: { name: "Wrapped Bitcoin", price: 68032, balance: "—" },
+const REFRESH_MS = 12_000;
+const DEBOUNCE_MS = 350;
+
+type EthereumProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
-const marketData = [
-  45, 49, 41, 36, 43, 39, 44, 41, 47, 53, 65, 58, 61, 56, 62, 57, 68, 65,
-  54, 49, 41, 39, 52, 58, 67, 71, 66, 56, 54, 48, 47, 43, 44, 51, 59, 55,
-];
-
-function formatTokenAmount(value: number, symbol: TokenSymbol) {
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: symbol === "ETH" || symbol === "WBTC" ? 4 : 2,
-    maximumFractionDigits: symbol === "ETH" || symbol === "WBTC" ? 6 : 2,
-  });
+function provider(): EthereumProvider | undefined {
+  return typeof window === "undefined"
+    ? undefined
+    : (window as unknown as { ethereum?: EthereumProvider }).ethereum;
 }
 
+type Stage = "idle" | "quoting" | "approving" | "swapping";
+
 export default function SwapPage() {
-  const { connected, ethBalance, onGiwa, openWallet, switchToGiwa } = useAppWallet();
-  const [mode, setMode] = useState<TradeMode>("Swap");
-  const [fromToken, setFromToken] = useState<TokenSymbol>("ETH");
-  const [toToken, setToToken] = useState<TokenSymbol>("USDC");
+  const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
+
+  const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDC");
+  const [toToken, setToToken] = useState<TokenSymbol>("mWETH");
   const [amount, setAmount] = useState("");
-  const [quoteReady, setQuoteReady] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [slippageBps, setSlippageBps] = useState(50);
   const [pickerSide, setPickerSide] = useState<"from" | "to" | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [approvalOpen, setApprovalOpen] = useState(false);
-  const [approvedTokens, setApprovedTokens] = useState<TokenSymbol[]>([]);
-  const [toast, setToast] = useState("");
-  const [period, setPeriod] = useState("1D");
-  const [limitPrice, setLimitPrice] = useState("2,600.00");
-  const [twapParts, setTwapParts] = useState("4");
 
-  const numericAmount = Number.parseFloat(amount);
-  const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("idle");
+  const [balances, setBalances] = useState<Partial<Record<TokenSymbol, bigint>>>({});
+  const [approved, setApproved] = useState<bigint>(0n);
+  const [pool, setPool] = useState<Awaited<ReturnType<typeof poolStatus>>>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setQuoteReady(false);
-    if (!hasAmount) return;
-    const timer = window.setTimeout(() => setQuoteReady(true), 520);
-    return () => window.clearTimeout(timer);
-  }, [amount, fromToken, toToken, mode, hasAmount]);
+  const inInfo = TOKENS[fromToken];
+  const outInfo = TOKENS[toToken];
+  const amountIn = useMemo(() => toBaseUnits(amount, inInfo.decimals), [amount, inInfo.decimals]);
+  const marketExists = hasMarket(fromToken, toToken);
 
-  useEffect(() => {
-    setLimitPrice(
-      (tokens[fromToken].price / tokens[toToken].price).toLocaleString("en-US", {
-        maximumFractionDigits: toToken === "ETH" || toToken === "WBTC" ? 6 : 2,
-      }),
+  // --- balances and allowance -------------------------------------------------------------
+  const refreshAccount = useCallback(async () => {
+    if (!connected || !address) return;
+    const owner = address as `0x${string}`;
+    const entries = await Promise.all(
+      TOKEN_LIST.map(
+        async (t) => [t.symbol, await balanceOf(t.address, owner).catch(() => 0n)] as const,
+      ),
     );
+    setBalances(Object.fromEntries(entries) as Partial<Record<TokenSymbol, bigint>>);
+    setApproved(
+      await allowance(inInfo.address, owner, CONTRACTS.router as `0x${string}`).catch(() => 0n),
+    );
+  }, [connected, address, inInfo.address]);
+
+  useEffect(() => {
+    void refreshAccount();
+  }, [refreshAccount]);
+
+  // --- the pool's own state, which is the interesting half of "why this price" -------------
+  useEffect(() => {
+    const base = fromToken === "mUSDC" ? toToken : fromToken;
+    const pairId = PAIR_IDS[base];
+    if (!pairId) {
+      setPool(null);
+      return;
+    }
+    let alive = true;
+    const tick = () => void poolStatus(pairId).then((p) => alive && setPool(p));
+    tick();
+    const id = setInterval(tick, 5_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
   }, [fromToken, toToken]);
 
-  const quote = useMemo(() => {
-    if (!hasAmount) return null;
-    const usdValue = numericAmount * tokens[fromToken].price;
-    const impact = usdValue < 1_000 ? 0.03 : usdValue < 10_000 ? 0.08 : usdValue < 50_000 ? 0.18 : 0.42;
-    const protocolFee = mode === "Limit" ? 0 : 0.0005;
-    const output = (usdValue / tokens[toToken].price) * (1 - impact / 100 - protocolFee);
-    const slippage = mode === "TWAP" ? 0.3 : 0.5;
-    const minimum = output * (1 - slippage / 100);
-    return {
-      usdValue,
-      output,
-      impact,
-      minimum,
-      slippage,
-      execution: "Dubu routing",
-      networkCost: usdValue > 25_000 ? 11.42 : 6.18,
-      rate: tokens[fromToken].price / tokens[toToken].price,
-    };
-  }, [fromToken, hasAmount, mode, numericAmount, toToken]);
+  // --- quoting ----------------------------------------------------------------------------
+  const abort = useRef<AbortController | null>(null);
 
-  const displayBalance = connected && fromToken === "ETH" && ethBalance
-    ? ethBalance
-    : tokens[fromToken].balance;
-
-  function selectToken(symbol: TokenSymbol) {
-    if (pickerSide === "from") {
-      if (symbol === toToken) setToToken(fromToken);
-      setFromToken(symbol);
-    } else {
-      if (symbol === fromToken) setFromToken(toToken);
-      setToToken(symbol);
+  const runQuote = useCallback(async () => {
+    abort.current?.abort();
+    if (amountIn <= 0n || !marketExists) {
+      setQuote(null);
+      setQuoteError(null);
+      return;
     }
-    setPickerSide(null);
-  }
+    const controller = new AbortController();
+    abort.current = controller;
+    setStage("quoting");
+    try {
+      const result = await fetchQuote({
+        tokenIn: inInfo.address,
+        tokenOut: outInfo.address,
+        amountIn,
+        // A quote is priced for a receiver and before a wallet is connected there is not one. The
+        // placeholder produces an identical price; the calldata it comes back with is never used,
+        // because the button is not a swap button until a wallet is attached.
+        receiver: (address || "0x0000000000000000000000000000000000000001") as `0x${string}`,
+        slippageBps,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (isQuoteError(result)) {
+        setQuote(null);
+        setQuoteError(result.detail ? `${result.error} — ${result.detail}` : result.error);
+      } else {
+        setQuote(result);
+        setQuoteError(null);
+      }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        setQuote(null);
+        setQuoteError(e instanceof Error ? e.message : "could not reach the aggregator");
+      }
+    } finally {
+      if (!controller.signal.aborted) setStage("idle");
+    }
+  }, [amountIn, marketExists, inInfo.address, outInfo.address, address, slippageBps]);
 
-  function reversePair() {
+  useEffect(() => {
+    const id = setTimeout(() => void runQuote(), DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [runQuote]);
+
+  useEffect(() => {
+    const id = setInterval(() => void runQuote(), REFRESH_MS);
+    return () => clearInterval(id);
+  }, [runQuote]);
+
+  // --- actions ----------------------------------------------------------------------------
+  const send = useCallback(
+    async (tx: { to: string; data: string; value?: string }) => {
+      const eth = provider();
+      if (!eth || !address) throw new Error("no wallet");
+      return (await eth.request({
+        method: "eth_sendTransaction",
+        params: [{ from: address, to: tx.to, data: tx.data, value: tx.value ?? "0x0" }],
+      })) as string;
+    },
+    [address],
+  );
+
+  const onApprove = useCallback(async () => {
+    if (!quote) return;
+    setError(null);
+    setStage("approving");
+    try {
+      const hash = await send({
+        to: quote.approve.token,
+        data: encodeApprove(quote.approve.spender, amountIn),
+      });
+      setTxHash(hash);
+      // The wallet returns as soon as the node accepts it; the allowance changes a block later.
+      setTimeout(() => void refreshAccount(), 2_500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "approval rejected");
+    } finally {
+      setStage("idle");
+    }
+  }, [quote, amountIn, send, refreshAccount]);
+
+  const onSwap = useCallback(async () => {
+    if (!quote) return;
+    setError(null);
+    setStage("swapping");
+    try {
+      const hash = await send({ to: quote.route.to, data: quote.route.data });
+      setTxHash(hash);
+      setAmount("");
+      setQuote(null);
+      setTimeout(() => void refreshAccount(), 2_500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "transaction rejected");
+    } finally {
+      setStage("idle");
+    }
+  }, [quote, send, refreshAccount]);
+
+  const reverse = () => {
     setFromToken(toToken);
     setToToken(fromToken);
     setAmount("");
-    setDetailsOpen(false);
-  }
+    setQuote(null);
+  };
 
-  function handlePrimaryAction() {
-    if (!connected) {
-      openWallet();
-      return;
-    }
-    if (!onGiwa) {
-      void switchToGiwa();
-      return;
-    }
-    if (fromToken !== "ETH" && !approvedTokens.includes(fromToken)) {
-      setApprovalOpen(true);
-      return;
-    }
-    setReviewOpen(true);
-  }
+  // --- derived ----------------------------------------------------------------------------
+  const outAmount = quote ? fromBaseUnits(BigInt(quote.amountOut), outInfo.decimals) : "";
+  const needsApproval = quote !== null && approved < amountIn;
+  const balance = balances[fromToken] ?? 0n;
+  const insufficient = amountIn > balance;
 
-  function approveToken() {
-    setApprovedTokens((current) => [...current, fromToken]);
-    setApprovalOpen(false);
-    setToast(`${fromToken} approved. You can now review the trade.`);
-    window.setTimeout(() => setToast(""), 2800);
-  }
+  const price = useMemo(() => {
+    if (!quote || amountIn === 0n) return null;
+    const outN = Number(
+      fromBaseUnits(BigInt(quote.amountOut), outInfo.decimals, 12).replace(/,/g, ""),
+    );
+    const inN = Number(fromBaseUnits(amountIn, inInfo.decimals, 12).replace(/,/g, ""));
+    if (!outN || !inN) return null;
+    return outN / inN;
+  }, [quote, amountIn, inInfo.decimals, outInfo.decimals]);
 
-  function submitTrade() {
-    setReviewOpen(false);
-    setToast(`${mode} submitted to your wallet for confirmation.`);
-    window.setTimeout(() => setToast(""), 3000);
-  }
+  const venues = useMemo(() => {
+    if (!quote) return [];
+    const d = quote.detail;
+    const best = BigInt(quote.amountOut);
+    const rows = [
+      {
+        key: "prop",
+        label: "DuBu Prop AMM",
+        out: BigInt(d.prop || "0"),
+        note: "oracle-priced ladder",
+        chosen: quote.route.venues.includes("prop"),
+      },
+      {
+        key: "univ2",
+        label: "UniswapV2",
+        out: BigInt(d.univ2 || "0"),
+        note: "constant product, 30bp fee",
+        chosen: quote.route.venues.includes("univ2"),
+      },
+      {
+        key: "rfq",
+        label: "DuBu RFQ",
+        out: d.rfq ? BigInt(d.rfq) : 0n,
+        note: d.rfq
+          ? "signed quote, priced on request"
+          : d.rfqMakerReason
+            ? `declined — ${d.rfqMakerReason}`
+            : `unavailable — ${d.rfqRejected ?? "off"}`,
+        chosen: quote.route.venues.includes("rfq"),
+      },
+    ];
+    return rows.map((r) => ({
+      ...r,
+      display: r.out > 0n ? fromBaseUnits(r.out, outInfo.decimals) : null,
+      deltaBps: r.out > 0n && best > 0n ? Number(((r.out - best) * 10_000n) / best) : null,
+    }));
+  }, [quote, outInfo.decimals]);
 
-  const actionLabel = !hasAmount
-    ? "Enter an amount"
-    : !quoteReady
-      ? "Fetching quote…"
-      : !connected
-        ? "Connect wallet"
-        : !onGiwa
-          ? "Switch to GIWA"
-        : fromToken !== "ETH" && !approvedTokens.includes(fromToken)
-          ? `Approve ${fromToken}`
-          : mode === "Swap"
-            ? "Review swap"
-            : mode === "Limit"
-              ? "Review limit order"
-              : "Review TWAP";
+  const capacity = useMemo(() => {
+    if (!pool) return null;
+    const base = fromToken === "mUSDC" ? toToken : fromToken;
+    const selling = fromToken === "mUSDC";
+    const cap = selling ? pool.askCapacity : pool.bidCapacity;
+    return {
+      side: selling ? "can sell" : "can buy",
+      amount: fromBaseUnits(cap, TOKENS[base].decimals, 2),
+      symbol: base,
+      age: pool.ageSecs,
+      decay: pool.decaySecs,
+      dying: pool.decaySecs > 0 && pool.ageSecs > pool.decaySecs / 2,
+    };
+  }, [pool, fromToken, toToken]);
+
+  const primary = (() => {
+    if (!connected) return { label: "Connect wallet", action: openWallet, disabled: false };
+    if (!onGiwa)
+      return { label: "Switch to GIWA Sepolia", action: () => void switchToGiwa(), disabled: false };
+    if (!marketExists) return { label: "No market for this pair", action: () => {}, disabled: true };
+    if (amountIn <= 0n) return { label: "Enter an amount", action: () => {}, disabled: true };
+    if (insufficient) return { label: `Not enough ${fromToken}`, action: () => {}, disabled: true };
+    if (stage === "quoting") return { label: "Finding best route…", action: () => {}, disabled: true };
+    if (!quote)
+      return { label: quoteError ? "No route" : "Enter an amount", action: () => {}, disabled: true };
+    if (needsApproval)
+      return {
+        label: stage === "approving" ? "Approving…" : `Approve ${fromToken}`,
+        action: () => void onApprove(),
+        disabled: stage !== "idle",
+      };
+    return {
+      label: stage === "swapping" ? "Confirm in wallet…" : "Swap",
+      action: () => void onSwap(),
+      disabled: stage !== "idle",
+    };
+  })();
 
   return (
     <div className="trade-page">
       <div className="trade-stage">
         <div className="trade-heading">
           <div>
-            <h1>Trade</h1>
-            <span>GIWA Sepolia</span>
+            <h1>Swap</h1>
+            <p>
+              Routed across the DuBu prop AMM, its RFQ maker, and UniswapV2 on GIWA Sepolia. Every
+              venue&rsquo;s independent quote is shown below.
+            </p>
           </div>
         </div>
 
         <Panel className="dex-swap-card">
-          <div className="trade-mode-tabs" role="tablist" aria-label="Trade type">
-            {(["Swap", "Limit", "TWAP"] as TradeMode[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                role="tab"
-                aria-selected={mode === item}
-                className={mode === item ? "active" : ""}
-                onClick={() => {
-                  setMode(item);
-                  setDetailsOpen(false);
-                }}
-              >
-                {item}
-              </button>
-            ))}
-            <button className="trade-settings-button" type="button" aria-label="Open trade settings" onClick={() => setDetailsOpen((current) => !current)}>⚙</button>
-          </div>
-
           <div className="dex-token-field">
             <div className="dex-field-label">
               <span>You pay</span>
-              <span>Balance: {displayBalance}{displayBalance !== "—" ? ` ${fromToken}` : ""}</span>
+              {connected && (
+                <span>
+                  Balance {fromBaseUnits(balance, inInfo.decimals, 4)} {fromToken}
+                </span>
+              )}
             </div>
             <div className="dex-field-main">
-              <input
-                value={amount}
-                inputMode="decimal"
-                aria-label="You pay"
-                placeholder="0"
-                onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
-              />
-              <button className="dex-token-button" type="button" onClick={() => setPickerSide("from")}>
+              <button
+                className="dex-token-button"
+                type="button"
+                onClick={() => setPickerSide("from")}
+              >
                 <TokenIcon symbol={fromToken} />
-                <strong>{fromToken}</strong>
-                <span>⌄</span>
+                <span>{fromToken}</span>
+                <span aria-hidden>▾</span>
               </button>
+              <input
+                inputMode="decimal"
+                placeholder="0"
+                value={amount}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) setAmount(v);
+                }}
+                aria-label={`Amount of ${fromToken} to swap`}
+              />
             </div>
             <div className="dex-field-fiat">
-              <span>{hasAmount ? `$${quote?.usdValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "$0.00"}</span>
-              {connected && fromToken === "ETH" && ethBalance && (
-                <button type="button" onClick={() => setAmount(ethBalance)}>Max</button>
+              <span>{inInfo.name}</span>
+              {connected && balance > 0n && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAmount(fromBaseUnits(balance, inInfo.decimals, 8).replace(/,/g, ""))
+                  }
+                >
+                  Max
+                </button>
               )}
             </div>
           </div>
 
-          <button className="dex-reverse" type="button" onClick={reversePair} aria-label="Reverse token pair">↓</button>
+          <button
+            className="dex-reverse"
+            type="button"
+            onClick={reverse}
+            aria-label="Reverse token pair"
+          >
+            ↓
+          </button>
 
           <div className="dex-token-field output">
             <div className="dex-field-label">
               <span>You receive</span>
-              <span>Balance: —</span>
+              {quote && (
+                <span>min {fromBaseUnits(BigInt(quote.minAmountOut), outInfo.decimals, 4)}</span>
+              )}
             </div>
             <div className="dex-field-main">
-              <div className={quoteReady ? "dex-quote-value" : "dex-quote-value muted"}>
-                {!hasAmount ? "0" : !quoteReady ? <span className="quote-loader" /> : formatTokenAmount(quote?.output ?? 0, toToken)}
-              </div>
               <button className="dex-token-button" type="button" onClick={() => setPickerSide("to")}>
                 <TokenIcon symbol={toToken} />
-                <strong>{toToken}</strong>
-                <span>⌄</span>
+                <span>{toToken}</span>
+                <span aria-hidden>▾</span>
               </button>
+              <input
+                readOnly
+                placeholder="0"
+                value={outAmount}
+                aria-label={`Amount of ${toToken} received`}
+              />
             </div>
             <div className="dex-field-fiat">
-              <span>{quoteReady && quote ? `$${(quote.output * tokens[toToken].price).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "$0.00"}</span>
+              <span>{outInfo.name}</span>
+              {price !== null && (
+                <span>
+                  1 {fromToken} ≈{" "}
+                  {price.toLocaleString("en-US", { maximumSignificantDigits: 6 })} {toToken}
+                </span>
+              )}
             </div>
           </div>
 
-          {mode === "Limit" && (
-            <div className="order-options">
-              <label><span>Limit price</span><div><input value={limitPrice} onChange={(event) => setLimitPrice(event.target.value)} /><b>{toToken} per {fromToken}</b></div></label>
-              <label><span>Expiry</span><button type="button">7 days⌄</button></label>
-            </div>
-          )}
-
-          {mode === "TWAP" && (
-            <div className="order-options">
-              <label><span>Split into</span><div><input value={twapParts} onChange={(event) => setTwapParts(event.target.value.replace(/\D/g, ""))} /><b>orders</b></div></label>
-              <label><span>Frequency</span><button type="button">Every 30 min⌄</button></label>
-            </div>
-          )}
-
-          {quoteReady && quote && (
-            <div className="quote-summary">
-              <button type="button" onClick={() => setDetailsOpen((current) => !current)} aria-expanded={detailsOpen}>
-                <span>1 {fromToken} = {formatTokenAmount(quote.rate, toToken)} {toToken}</span>
-                <span>Network cost ${quote.networkCost.toFixed(2)} <b>{detailsOpen ? "⌃" : "⌄"}</b></span>
-              </button>
-              {detailsOpen && (
-                <dl className="quote-details">
-                  <div><dt>Price impact</dt><dd className={quote.impact >= 0.4 ? "warning" : ""}>{quote.impact.toFixed(2)}%</dd></div>
-                  <div><dt>Minimum received</dt><dd>{formatTokenAmount(quote.minimum, toToken)} {toToken}</dd></div>
-                  <div><dt>Max slippage</dt><dd>{quote.slippage.toFixed(1)}%</dd></div>
-                  <div><dt>Execution</dt><dd>{quote.execution} <span className="route-info-dot">ⓘ</span></dd></div>
-                </dl>
+          {quote && (
+            <div className="dubu-venues">
+              <div className="dubu-venues-head">
+                <span>Where this price came from</span>
+                {quote.detail.split && <span className="dubu-badge">split route</span>}
+              </div>
+              {venues.map((v) => (
+                <div key={v.key} className={`dubu-venue-row${v.chosen ? " chosen" : ""}`}>
+                  <div className="dubu-venue-name">
+                    <strong>{v.label}</strong>
+                    <small>{v.note}</small>
+                  </div>
+                  <div className="dubu-venue-out">
+                    {v.display ? (
+                      <>
+                        <span>{v.display}</span>
+                        {v.deltaBps !== null && v.deltaBps !== 0 && (
+                          <small className={v.deltaBps > 0 ? "up" : "down"}>
+                            {v.deltaBps > 0 ? "+" : ""}
+                            {v.deltaBps} bp
+                          </small>
+                        )}
+                      </>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {quote.detail.split && (
+                <div className="dubu-split">
+                  {quote.detail.legs.map((l) => (
+                    <span key={l.venue}>
+                      {l.venue} {(l.weightBps / 100).toFixed(0)}%
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           )}
 
-          <button
-            className="app-primary-button dex-action-button"
-            type="button"
-            disabled={!hasAmount || !quoteReady}
-            onClick={handlePrimaryAction}
-          >
-            {actionLabel}
-          </button>
-        </Panel>
-
-        <p className="trade-disclaimer">Rates refresh automatically. Final execution may change before confirmation.</p>
-      </div>
-
-      <aside className="trade-side">
-        <Panel className="pair-market-panel">
-          <SectionTitle
-            action={
-              <div className="segmented-control">
-                {["1D", "1W", "1M"].map((item) => (
-                  <button key={item} type="button" className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>
-                ))}
-              </div>
-            }
-          >
-            {fromToken} / {toToken}
-          </SectionTitle>
-          <div className="pair-price">
-            <strong>{formatTokenAmount(tokens[fromToken].price / tokens[toToken].price, toToken)}</strong>
-            <span>+0.97%</span>
-          </div>
-          <Sparkline data={marketData} height={150} label={`${period} ${fromToken} ${toToken} market chart`} />
-          <dl className="pair-market-stats">
-            <div><dt>24h high</dt><dd>2,602.34</dd></div>
-            <div><dt>24h low</dt><dd>2,475.21</dd></div>
-            <div><dt>24h volume</dt><dd>$1.24B</dd></div>
-          </dl>
-        </Panel>
-
-        <Panel className="activity-empty-panel">
-          <SectionTitle>Recent transactions</SectionTitle>
-          <div className="dex-empty-state">
-            <span>↗</span>
-            <strong>No recent transactions</strong>
-            <p>{connected ? "Your swaps will appear here after they are submitted." : "Connect your wallet to view your transaction history."}</p>
-            {!connected && <button type="button" onClick={openWallet}>Connect wallet</button>}
-          </div>
-        </Panel>
-      </aside>
-
-      {pickerSide && (
-        <div className="app-modal-backdrop" role="presentation">
-          <div className="app-modal token-picker-modal" role="dialog" aria-modal="true" aria-labelledby="token-picker-title">
-            <button className="app-modal-close" type="button" aria-label="Close token selector" onClick={() => setPickerSide(null)}>×</button>
-            <h2 id="token-picker-title">Select a token</h2>
-            <label className="token-search-field"><span>⌕</span><input autoFocus placeholder="Search name or paste address" aria-label="Search tokens" /></label>
-            <div className="popular-token-row">
-              {(["ETH", "USDC", "USDT"] as TokenSymbol[]).map((symbol) => (
-                <button key={symbol} type="button" onClick={() => selectToken(symbol)}><TokenIcon symbol={symbol} />{symbol}</button>
-              ))}
+          {capacity && (
+            <div className="dubu-pool">
+              <span>
+                Pool {capacity.side} {capacity.amount} {capacity.symbol}
+              </span>
+              <span className={capacity.dying ? "warn" : ""}>
+                quote {capacity.age}s old
+                {capacity.decay > 0 && ` · fades at ${capacity.decay}s`}
+              </span>
             </div>
-            <div className="token-list">
-              {(Object.keys(tokens) as TokenSymbol[]).map((symbol) => (
-                <button key={symbol} type="button" onClick={() => selectToken(symbol)}>
-                  <TokenIcon symbol={symbol} />
-                  <span><strong>{tokens[symbol].name}</strong><small>{symbol}</small></span>
-                  <b>{connected ? tokens[symbol].balance : "—"}</b>
+          )}
+
+          <div className="dubu-slippage">
+            <span>Max slippage</span>
+            <div>
+              {[10, 50, 100].map((bps) => (
+                <button
+                  key={bps}
+                  type="button"
+                  className={slippageBps === bps ? "active" : ""}
+                  onClick={() => setSlippageBps(bps)}
+                >
+                  {bps / 100}%
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      )}
 
-      {approvalOpen && (
-        <div className="app-modal-backdrop" role="presentation">
-          <div className="app-modal compact-trade-modal" role="dialog" aria-modal="true" aria-labelledby="approval-title">
-            <button className="app-modal-close" type="button" aria-label="Close approval" onClick={() => setApprovalOpen(false)}>×</button>
-            <TokenIcon symbol={fromToken} />
-            <h2 id="approval-title">Approve {fromToken}</h2>
-            <p>Allow the Dubu router contract to use your {fromToken} for this trade. This is required once per token.</p>
-            <button className="app-primary-button" type="button" onClick={approveToken}>Approve in wallet</button>
-            <button className="app-quiet-button" type="button" onClick={() => setApprovalOpen(false)}>Cancel</button>
+          {quoteError && <div className="dubu-alert">{quoteError}</div>}
+          {error && <div className="dubu-alert">{error}</div>}
+
+          <button
+            className="app-primary-button dex-action-button"
+            type="button"
+            onClick={primary.action}
+            disabled={primary.disabled}
+          >
+            {primary.label}
+          </button>
+
+          {txHash && (
+            <a
+              className="dubu-txlink"
+              href={`${EXPLORER}/tx/${txHash}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View transaction ↗
+            </a>
+          )}
+
+          <p className="dubu-footnote">
+            Quotes from <code>{AGGREGATOR.replace(/^https?:\/\//, "")}</code>. It holds no keys and
+            takes no custody — it returns calldata your wallet signs, and the minimum received is
+            inside what you sign.
+          </p>
+        </Panel>
+      </div>
+
+      {pickerSide && (
+        <div
+          className="dubu-picker-backdrop"
+          onClick={() => setPickerSide(null)}
+          role="presentation"
+        >
+          <div
+            className="dubu-picker"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Select token"
+          >
+            <h3>Select a token</h3>
+            {TOKEN_LIST.map((t) => {
+              const other = pickerSide === "from" ? toToken : fromToken;
+              const unavailable = t.symbol !== other && !hasMarket(t.symbol, other);
+              return (
+                <button
+                  key={t.symbol}
+                  type="button"
+                  disabled={t.symbol === other || unavailable}
+                  onClick={() => {
+                    if (pickerSide === "from") setFromToken(t.symbol);
+                    else setToToken(t.symbol);
+                    setPickerSide(null);
+                    setQuote(null);
+                  }}
+                >
+                  <TokenIcon symbol={t.symbol} />
+                  <div>
+                    <strong>{t.symbol}</strong>
+                    <small>
+                      {t.name} · tracks {t.tracks}
+                    </small>
+                  </div>
+                  <span className="muted">
+                    {unavailable
+                      ? "no market"
+                      : connected
+                        ? fromBaseUnits(balances[t.symbol] ?? 0n, t.decimals, 4)
+                        : ""}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
-
-      {reviewOpen && quote && (
-        <div className="app-modal-backdrop" role="presentation">
-          <div className="app-modal trade-review-modal" role="dialog" aria-modal="true" aria-labelledby="review-title">
-            <button className="app-modal-close" type="button" aria-label="Close review" onClick={() => setReviewOpen(false)}>×</button>
-            <h2 id="review-title">Review {mode.toLowerCase()}</h2>
-            <div className="review-token-line"><TokenIcon symbol={fromToken} /><span>You pay</span><strong>{amount} {fromToken}</strong></div>
-            <div className="review-arrow">↓</div>
-            <div className="review-token-line"><TokenIcon symbol={toToken} /><span>You receive</span><strong>{formatTokenAmount(quote.output, toToken)} {toToken}</strong></div>
-            <dl className="review-details">
-              <div><dt>Rate</dt><dd>1 {fromToken} = {formatTokenAmount(quote.rate, toToken)} {toToken}</dd></div>
-              <div><dt>Price impact</dt><dd>{quote.impact.toFixed(2)}%</dd></div>
-              <div><dt>Minimum received</dt><dd>{formatTokenAmount(quote.minimum, toToken)} {toToken}</dd></div>
-              <div><dt>Network cost</dt><dd>${quote.networkCost.toFixed(2)}</dd></div>
-            </dl>
-            <button className="app-primary-button" type="button" onClick={submitTrade}>Confirm in wallet</button>
-            <p className="wallet-confirm-note">You will confirm the final transaction in your wallet.</p>
-          </div>
-        </div>
-      )}
-
-      {toast && <Toast>{toast}</Toast>}
     </div>
   );
 }

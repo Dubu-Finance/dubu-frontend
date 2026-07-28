@@ -6449,3 +6449,235 @@
     padding-left: 16px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Routing transparency.
+
+   DuBu owns both the router and one of the venues it routes to, so what each
+   venue independently quoted sits next to what was chosen rather than behind a
+   details toggle. If the router ever prefers its own book against the numbers,
+   this panel is where it shows.
+   --------------------------------------------------------------------------- */
+
+.dubu-venues {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-line);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--app-soft) 45%, transparent);
+}
+
+.dubu-venues-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--app-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dubu-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+  color: var(--app-accent-deep);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.dubu-venue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+
+.dubu-venue-row.chosen {
+  background: color-mix(in srgb, var(--app-accent) 11%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, transparent);
+}
+
+.dubu-venue-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.dubu-venue-name strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dubu-venue-name small,
+.dubu-venue-out small {
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.dubu-venue-out {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.dubu-venue-out small.up { color: var(--app-success); }
+.dubu-venue-out small.down { color: var(--app-muted); }
+.dubu-venue-out .muted,
+.dubu-picker .muted { color: var(--app-muted); }
+
+.dubu-split {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--app-line);
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.dubu-split span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-surface-solid) 70%, transparent);
+}
+
+/* The pool's own state. `fades at` is the on-chain decay ramp: a maker that
+   stops updating watches its depth walk to zero rather than quoting a dead
+   price, and a taker can see how far along that is. */
+.dubu-pool {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 0 4px;
+  color: var(--app-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dubu-pool .warn { color: var(--app-danger); }
+
+.dubu-slippage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 0 4px;
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.dubu-slippage div { display: flex; gap: 5px; }
+
+.dubu-slippage button {
+  padding: 3px 9px;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.dubu-slippage button.active {
+  border-color: color-mix(in srgb, var(--app-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 13%, transparent);
+  color: var(--app-accent-deep);
+}
+
+.dubu-alert {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--app-danger) 32%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--app-danger) 8%, transparent);
+  color: var(--app-danger);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dubu-txlink {
+  display: block;
+  margin-top: 10px;
+  color: var(--app-accent-deep);
+  font-size: 11px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.dubu-txlink:hover { text-decoration: underline; }
+
+.dubu-footnote {
+  margin: 12px 4px 0;
+  color: var(--app-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.dubu-footnote code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--app-soft) 70%, transparent);
+  font-size: 9px;
+}
+
+.dubu-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--app-bg) 72%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.dubu-picker {
+  width: min(380px, 100%);
+  padding: 18px;
+  border: 1px solid var(--app-line);
+  border-radius: 20px;
+  background: var(--app-surface-solid);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 22%);
+}
+
+.dubu-picker h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dubu-picker button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dubu-picker button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-soft) 65%, transparent);
+}
+
+.dubu-picker button:disabled { opacity: 0.4; cursor: not-allowed; }
+.dubu-picker button div { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.dubu-picker button strong { font-size: 12px; font-weight: 600; }
+.dubu-picker button small { color: var(--app-muted); font-size: 10px; }
+.dubu-picker button > span:last-child { font-size: 11px; font-variant-numeric: tabular-nums; }
