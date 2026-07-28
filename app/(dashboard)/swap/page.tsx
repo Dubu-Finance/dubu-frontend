@@ -36,7 +36,16 @@ import {
  * anyone can check the router did not favour its own book.
  */
 
-const REFRESH_MS = 12_000;
+// How often the displayed quote is re-fetched.
+//
+// It was 12s, which is not a number this system can support: the pool re-quotes every ~590ms and
+// the RFQ maker signs orders with a 2s TTL, so a 12s-old quote carried an RFQ order that had been
+// dead for ten of those seconds. The RFQ leg could be displayed but essentially never executed.
+//
+// 2.5s for the display. Freshness at signing time is not this interval's job -- see `onSwap`,
+// which re-quotes before it sends, because no polling interval can make a quote fresh at the
+// unpredictable moment a user decides to click.
+const REFRESH_MS = 2_500;
 const DEBOUNCE_MS = 350;
 
 type EthereumProvider = {
@@ -104,7 +113,9 @@ export default function SwapPage() {
     let alive = true;
     const tick = () => void poolStatus(pairId).then((p) => alive && setPool(p));
     tick();
-    const id = setInterval(tick, 5_000);
+    // 2s. The pool re-quotes every ~590ms and its capacity starts fading at 30s, so a 5s poll could
+    // show a quote as 5s older than it was and, on the fade ramp, a capacity that had already moved.
+    const id = setInterval(tick, 2_000);
     return () => {
       alive = false;
       clearInterval(id);
@@ -201,7 +212,38 @@ export default function SwapPage() {
     setError(null);
     setStage("swapping");
     try {
-      const hash = await send({ to: quote.route.to, data: quote.route.data });
+      // Re-quote before signing rather than sending what is on screen.
+      //
+      // The displayed quote is up to REFRESH_MS old and the click lands at an unpredictable moment
+      // inside that window, so the route in state can carry an RFQ order whose 2s TTL has expired
+      // -- which does not mis-price, it reverts, and the taker pays gas to learn that.
+      //
+      // The user's protection is unchanged: they still cannot receive less than the minimum they
+      // were shown, because a fresh quote worse than that minimum is refused here rather than
+      // signed. Slippage tolerance is what the displayed minimum already encodes; this only stops
+      // it being silently re-based on a newer, worse price.
+      const fresh = await fetchQuote({
+        tokenIn: inInfo.address,
+        tokenOut: outInfo.address,
+        amountIn,
+        receiver: address as `0x${string}`,
+        slippageBps,
+      });
+      if (isQuoteError(fresh)) {
+        setError(fresh.detail ? `${fresh.error} — ${fresh.detail}` : fresh.error);
+        return;
+      }
+      if (BigInt(fresh.amountOut) < BigInt(quote.minAmountOut)) {
+        setError(
+          `price moved past your slippage while you were deciding — ` +
+            `${fromBaseUnits(BigInt(fresh.amountOut), outInfo.decimals, 6)} ${outInfo.symbol} now, ` +
+            `you were shown a minimum of ${fromBaseUnits(BigInt(quote.minAmountOut), outInfo.decimals, 6)}. ` +
+            `Nothing was sent.`,
+        );
+        return;
+      }
+      setQuote(fresh);
+      const hash = await send({ to: fresh.route.to, data: fresh.route.data });
       setTxHash(hash);
       setAmount("");
       setQuote(null);
@@ -211,7 +253,18 @@ export default function SwapPage() {
     } finally {
       setStage("idle");
     }
-  }, [quote, send, refreshAccount]);
+  }, [
+    quote,
+    send,
+    refreshAccount,
+    amountIn,
+    address,
+    slippageBps,
+    inInfo.address,
+    outInfo.address,
+    outInfo.decimals,
+    outInfo.symbol,
+  ]);
 
   const reverse = () => {
     setFromToken(toToken);
