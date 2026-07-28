@@ -402,7 +402,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 export function TokenIcon({ symbol }: { symbol: string }) {
   const imageMap: Record<string, string> = {
     ETH: "/assets/asset_04.png",
+    WETH: "/assets/asset_04.png",
+    mWETH: "/assets/asset_04.png",
     USDC: "/assets/asset_05.png",
+    mUSDC: "/assets/asset_05.png",
+    WBTC: "/assets/wbtc.png",
+    mWBTC: "/assets/wbtc.png",
   };
 
   if (imageMap[symbol]) {
