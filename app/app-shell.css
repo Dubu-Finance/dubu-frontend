@@ -6450,6 +6450,56 @@
   }
 }
 
+.swap-centered-page {
+  display: flex;
+  justify-content: center;
+}
+
+.swap-centered-page .trade-stage {
+  width: min(100%, 620px);
+  max-width: 620px;
+  justify-self: auto;
+}
+
+.swap-centered-page .trade-heading {
+  min-height: auto;
+  margin: 14px 0 22px;
+  justify-content: center;
+  text-align: center;
+}
+
+.swap-centered-page .trade-heading > div {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.swap-centered-page .trade-heading p {
+  max-width: 560px;
+  margin: 0 auto;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.swap-centered-page .dex-swap-card {
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (max-width: 780px) {
+  .swap-centered-page .trade-heading {
+    margin-top: 4px;
+  }
+
+  .swap-centered-page .trade-heading p {
+    max-width: 500px;
+    font-size: 10px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Routing transparency.
 

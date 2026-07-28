@@ -366,7 +366,7 @@ export default function SwapPage() {
   })();
 
   return (
-    <div className="trade-page">
+    <div className="trade-page swap-centered-page">
       <div className="trade-stage">
         <div className="trade-heading">
           <div>
