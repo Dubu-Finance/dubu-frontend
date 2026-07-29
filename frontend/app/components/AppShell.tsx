@@ -78,6 +78,7 @@ const navItems = [
   { href: "/swap", label: "Swap", icon: "⇄" },
   { href: "/trade", label: "Trade", icon: "⌁" },
   { href: "/portfolio", label: "Portfolio", icon: "⬡" },
+  { href: "/faucet", label: "Faucet", icon: "♢" },
   { href: "/settings", label: "Settings", icon: "⚙" },
 ];
 

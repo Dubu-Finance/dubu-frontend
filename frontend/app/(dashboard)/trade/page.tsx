@@ -16,7 +16,8 @@ import {
   type StoredCandle,
 } from "@/app/lib/market-data";
 
-type PairKey = `${Exclude<TokenSymbol, "mUSDC">}/mUSDC`;
+type TradeBaseSymbol = Exclude<TokenSymbol, "mUSDC" | "mSPCX">;
+type PairKey = `${TradeBaseSymbol}/mUSDC`;
 type OrderMode = "Market" | "Limit";
 type OrderTab = "Active" | "History";
 type ChartInterval = "5m" | "15m" | "1h" | "4h";
@@ -28,7 +29,7 @@ type MarketData = {
 };
 
 const pairs: Record<PairKey, {
-  base: Exclude<TokenSymbol, "mUSDC">;
+  base: TradeBaseSymbol;
   quote: "mUSDC";
   dataId: string | null;
 }> = {

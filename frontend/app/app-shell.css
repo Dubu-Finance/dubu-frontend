@@ -383,6 +383,468 @@
   height: 13px;
 }
 
+/* Faucet */
+.faucet-page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding-bottom: 64px;
+}
+
+.faucet-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.faucet-wallet-chip {
+  min-height: 42px;
+  margin-top: 4px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  color: var(--app-muted);
+  background: var(--app-surface);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.faucet-wallet-chip > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bdb7ae;
+}
+
+.faucet-wallet-chip > span.connected {
+  background: var(--app-success);
+  box-shadow: 0 0 0 4px rgba(34, 150, 83, 0.1);
+}
+
+.faucet-hero {
+  min-height: 244px;
+  margin-top: 30px;
+  padding: 38px 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 32%, rgba(213, 154, 88, 0.2), transparent 32%),
+    linear-gradient(120deg, rgba(255, 253, 249, 0.9), rgba(247, 237, 224, 0.72));
+}
+
+.app-dark .faucet-hero {
+  background:
+    radial-gradient(circle at 88% 32%, rgba(213, 154, 88, 0.18), transparent 32%),
+    linear-gradient(120deg, rgba(48, 42, 35, 0.92), rgba(40, 35, 29, 0.74));
+}
+
+.faucet-eyebrow {
+  display: inline-flex;
+  margin-bottom: 12px;
+  color: var(--app-accent-deep);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.faucet-hero h2 {
+  max-width: 560px;
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(30px, 3vw, 43px);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+}
+
+.faucet-hero-copy > p {
+  max-width: 545px;
+  margin: 16px 0 24px;
+  color: var(--app-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.faucet-steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.faucet-steps span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.faucet-steps b {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(180, 126, 69, 0.2);
+  border-radius: 50%;
+  color: var(--app-accent-deep);
+  background: rgba(222, 183, 139, 0.12);
+  font-size: 11px;
+}
+
+.faucet-steps i {
+  width: 32px;
+  height: 1px;
+  background: var(--app-line);
+}
+
+.faucet-hero-art {
+  position: relative;
+  width: 220px;
+  height: 158px;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+}
+
+.faucet-drop {
+  width: 118px;
+  height: 118px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(178, 119, 54, 0.16);
+  border-radius: 42% 58% 58% 42% / 52% 42% 58% 48%;
+  color: #b67735;
+  background: linear-gradient(145deg, #f2d7b8, #d9a166);
+  box-shadow: 0 22px 45px rgba(126, 78, 31, 0.17), inset 0 1px rgba(255, 255, 255, 0.65);
+  font-size: 42px;
+  transform: rotate(-9deg);
+}
+
+.faucet-hero-art > div {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  display: flex;
+}
+
+.faucet-hero-art .token-icon {
+  width: 42px;
+  height: 42px;
+  margin-left: -9px;
+  border: 5px solid var(--app-surface-solid);
+  border-radius: 50%;
+  background: var(--app-surface-solid);
+  box-shadow: 0 8px 18px rgba(82, 54, 25, 0.12);
+}
+
+.faucet-hero-art .token-icon img {
+  width: 28px;
+  height: 28px;
+}
+
+.faucet-connect-card {
+  margin-top: 18px;
+  padding: 19px 22px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.faucet-connect-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: var(--app-accent-deep);
+  background: var(--app-soft);
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.faucet-connect-card h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.faucet-connect-card p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.faucet-connect-card .app-primary-button {
+  min-width: 156px;
+}
+
+.faucet-toolbar {
+  margin: 30px 0 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.faucet-toolbar > div {
+  padding: 4px;
+  display: flex;
+  gap: 3px;
+  border-radius: 13px;
+  background: var(--app-soft);
+}
+
+.faucet-toolbar button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--app-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.faucet-toolbar button.active {
+  color: var(--app-text);
+  background: var(--app-surface-solid);
+  box-shadow: 0 2px 8px rgba(66, 45, 25, 0.06);
+}
+
+.faucet-toolbar > button {
+  border: 1px solid var(--app-line);
+  background: var(--app-surface);
+}
+
+.faucet-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.faucet-notice {
+  min-height: 48px;
+  margin-bottom: 15px;
+  padding: 11px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(34, 150, 83, 0.14);
+  border-radius: 13px;
+  color: var(--app-success);
+  background: rgba(34, 150, 83, 0.07);
+  font-size: 12px;
+}
+
+.faucet-notice.error {
+  border-color: rgba(229, 79, 79, 0.15);
+  color: var(--app-danger);
+  background: rgba(229, 79, 79, 0.07);
+}
+
+.faucet-notice > span {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: currentColor;
+  font-weight: 800;
+}
+
+.faucet-notice > span::first-letter {
+  color: #fff;
+}
+
+.faucet-notice p {
+  margin: 0;
+  flex: 1;
+  color: var(--app-text);
+}
+
+.faucet-notice a {
+  color: currentColor;
+  font-weight: 700;
+}
+
+.faucet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.faucet-asset-card {
+  min-height: 248px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+}
+
+.faucet-asset-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.faucet-asset-top .token-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.faucet-asset-top .token-icon img {
+  width: 33px;
+  height: 33px;
+}
+
+.faucet-asset-top > span {
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: var(--app-muted);
+  background: var(--app-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.faucet-asset-name {
+  margin-top: 18px;
+}
+
+.faucet-asset-name h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.025em;
+}
+
+.faucet-asset-name p {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.faucet-asset-balance {
+  margin: 18px 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.faucet-asset-balance small {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.faucet-asset-balance strong {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.faucet-asset-card > button {
+  min-height: 43px;
+  margin-top: auto;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(173, 113, 49, 0.16);
+  border-radius: 12px;
+  color: var(--app-accent-deep);
+  background: linear-gradient(100deg, rgba(227, 194, 154, 0.18), rgba(245, 234, 220, 0.72));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.app-dark .faucet-asset-card > button {
+  background: rgba(173, 113, 49, 0.12);
+}
+
+.faucet-asset-card > button:not(:disabled):hover {
+  border-color: rgba(173, 113, 49, 0.34);
+  transform: translateY(-1px);
+}
+
+.faucet-asset-card > button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.faucet-footnote {
+  margin: 18px 0 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .faucet-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .faucet-heading-row {
+    display: block;
+  }
+
+  .faucet-wallet-chip {
+    margin-top: 16px;
+  }
+
+  .faucet-hero {
+    padding: 28px 24px;
+    grid-template-columns: 1fr;
+  }
+
+  .faucet-hero-art {
+    display: none;
+  }
+
+  .faucet-steps {
+    gap: 8px;
+  }
+
+  .faucet-steps i {
+    width: 16px;
+  }
+
+  .faucet-connect-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .faucet-connect-card .app-primary-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .faucet-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .faucet-toolbar > div {
+    justify-content: space-between;
+  }
+
+  .faucet-toolbar > div button {
+    flex: 1;
+  }
+
+  .faucet-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .token-weth { background: #202124; }
 .token-usdc { background: #2775ca; }
 .token-musdc { background: #2775ca; }
