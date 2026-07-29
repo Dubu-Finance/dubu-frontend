@@ -419,7 +419,7 @@ export default function SwapPage() {
           <strong>Select token</strong>
           <span>Available assets</span>
         </div>
-        {TOKEN_LIST.map((token) => {
+        {TOKEN_LIST.filter((token) => token.symbol !== "mSPCX").map((token) => {
           const unavailable = token.symbol !== other && !hasMarket(token.symbol, other);
           const selected = token.symbol === (side === "from" ? fromToken : toToken);
           return (
@@ -437,7 +437,7 @@ export default function SwapPage() {
               }}
             >
               <TokenIcon symbol={token.symbol} />
-              <span>
+              <span className="dubu-token-copy">
                 <strong>{token.symbol}</strong>
                 <small>{token.name}</small>
               </span>

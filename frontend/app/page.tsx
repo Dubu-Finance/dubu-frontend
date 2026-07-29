@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { TOKEN_ICON_URLS } from "@/app/lib/token-icons";
 
 const features = [
   {
@@ -141,8 +142,8 @@ export default function Home() {
               <div className="token-main">
                 <button className="token-select" type="button" onClick={reversePair}>
                   {fromToken === "ETH"
-                    ? <img src="/assets/asset_04.png" alt="" />
-                    : <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />}
+                    ? <img className="landing-token-icon" src={TOKEN_ICON_URLS.ETH} alt="" />
+                    : <img className="landing-token-icon" src={TOKEN_ICON_URLS.USDC} alt="" />}
                   {fromToken} <span>⌄</span>
                 </button>
                 <label className="amount-field">
@@ -172,8 +173,8 @@ export default function Home() {
               <div className="token-main">
                 <button className="token-select" type="button" onClick={reversePair}>
                   {toToken === "ETH"
-                    ? <img src="/assets/asset_04.png" alt="" />
-                    : <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />}
+                    ? <img className="landing-token-icon" src={TOKEN_ICON_URLS.ETH} alt="" />
+                    : <img className="landing-token-icon" src={TOKEN_ICON_URLS.USDC} alt="" />}
                   {toToken} <span>⌄</span>
                 </button>
                 <div className="amount-field output">
@@ -254,7 +255,7 @@ export default function Home() {
           <div className="route-orbit orbit-one" />
           <div className="route-orbit orbit-two" />
           <div className="route-token route-origin">
-            <img src="/assets/asset_04.png" alt="" />
+            <img className="landing-token-icon" src={TOKEN_ICON_URLS.ETH} alt="" />
             <span>1.00 ETH</span>
           </div>
           <div className="route-lines">
@@ -266,7 +267,7 @@ export default function Home() {
             ))}
           </div>
           <div className="route-token route-destination">
-            <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />
+            <img className="landing-token-icon" src={TOKEN_ICON_URLS.USDC} alt="" />
             <span>2,543.71 USDC</span>
           </div>
           <div className="route-saving"><span>Quote status</span><strong>Ready</strong></div>

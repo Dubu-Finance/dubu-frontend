@@ -27,8 +27,6 @@ type MarketData = {
   candles: MarketCandle[];
 };
 
-type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
-
 const pairs: Record<PairKey, {
   base: Exclude<TokenSymbol, "mUSDC">;
   quote: "mUSDC";
@@ -42,7 +40,6 @@ const pairs: Record<PairKey, {
   "mSKHY/mUSDC": { base: "mSKHY", quote: "mUSDC", dataId: null },
   "mAAPL/mUSDC": { base: "mAAPL", quote: "mUSDC", dataId: null },
   "mTSLA/mUSDC": { base: "mTSLA", quote: "mUSDC", dataId: null },
-  "mSPCX/mUSDC": { base: "mSPCX", quote: "mUSDC", dataId: null },
 };
 
 const pairKeys = MARKETS.map((market) => `${market.base}/${market.quote}` as PairKey);
@@ -94,7 +91,6 @@ export default function TradePage() {
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
-  const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [priceFlash, setPriceFlash] = useState<{
     direction: "up" | "down" | "";
     sequence: number;
@@ -158,7 +154,6 @@ export default function TradePage() {
       setMarketData(null);
       setMarketLoading(false);
       setMarketError("");
-      setStreamStatus("idle");
       return;
     }
     const marketId = dataId;
@@ -202,7 +197,6 @@ export default function TradePage() {
   useEffect(() => {
     const dataId = pair.dataId;
     if (!dataId || !marketDataAvailable) {
-      setStreamStatus("idle");
       return;
     }
 
@@ -253,7 +247,7 @@ export default function TradePage() {
 
     return subscribeToMarket({
       marketId: dataId,
-      onStatus: setStreamStatus,
+      onStatus: () => undefined,
       onTicker: updateTicker,
       onCandle: (candleInterval, candle) => {
         if (candleInterval === interval) updateCandle(candle);
@@ -305,16 +299,6 @@ export default function TradePage() {
       : !hasAmount
         ? "Enter an amount"
         : `Review ${mode.toLowerCase()} order`;
-  const streamLabel = streamStatus === "live"
-    ? "Live"
-    : streamStatus === "connecting"
-      ? "Connecting"
-      : streamStatus === "reconnecting"
-        ? "Reconnecting"
-        : pair.dataId
-          ? "Historical"
-          : "Offline";
-
   return (
     <>
       <div className="advanced-trade-shell">
@@ -382,11 +366,6 @@ export default function TradePage() {
                   </button>
                 ))}
               </div>
-              <span className={`terminal-stream-status ${streamStatus}`}>
-                <i aria-hidden="true" />
-                {streamLabel}
-              </span>
-              <button type="button" title="Chart settings" aria-label="Chart settings">⚙</button>
             </div>
 
             <div className="terminal-chart" aria-label={`${pairKey} candlestick chart`}>
