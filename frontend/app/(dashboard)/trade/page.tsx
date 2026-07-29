@@ -42,6 +42,7 @@ const pairs: Record<PairKey, {
   "mSKHY/mUSDT": { base: "mSKHY", quote: "mUSDT", dataId: null },
   "mAAPL/mUSDT": { base: "mAAPL", quote: "mUSDT", dataId: null },
   "mTSLA/mUSDT": { base: "mTSLA", quote: "mUSDT", dataId: null },
+  "mSPCX/mUSDT": { base: "mSPCX", quote: "mUSDT", dataId: null },
 };
 
 const pairKeys = MARKETS.map((market) => `${market.base}/${market.quote}` as PairKey);
