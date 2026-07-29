@@ -6,7 +6,7 @@ services:
     region: singapore
     branch: main
     buildCommand: npm ci
-    startCommand: npm run market:server
+    startCommand: node market-server/index.mjs
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
