@@ -29,7 +29,7 @@ const stats = [
   ["91342", "Chain ID"],
   ["EVM", "Compatible"],
   ["ETH", "Gas token"],
-  ["GIWA", "Sepolia"],
+  ["Onchain", "Execution"],
 ];
 
 const routes = [
@@ -41,7 +41,7 @@ const routes = [
 export default function Home() {
   const [isDark, setIsDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [fromToken, setFromToken] = useState<"ETH" | "USDT">("ETH");
+  const [fromToken, setFromToken] = useState<"ETH" | "USDC">("ETH");
   const [amount, setAmount] = useState("");
 
   const output = useMemo(() => {
@@ -57,10 +57,10 @@ export default function Home() {
         });
   }, [amount, fromToken]);
 
-  const toToken = fromToken === "ETH" ? "USDT" : "ETH";
+  const toToken = fromToken === "ETH" ? "USDC" : "ETH";
 
   function reversePair() {
-    setFromToken((current) => (current === "ETH" ? "USDT" : "ETH"));
+    setFromToken((current) => (current === "ETH" ? "USDC" : "ETH"));
     setAmount(output.replaceAll(",", ""));
   }
 
@@ -142,7 +142,7 @@ export default function Home() {
                 <button className="token-select" type="button" onClick={reversePair}>
                   {fromToken === "ETH"
                     ? <img src="/assets/asset_04.png" alt="" />
-                    : <img className="landing-usdt-icon" src="https://cdn.simpleicons.org/tether/26A17B" alt="" />}
+                    : <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />}
                   {fromToken} <span>⌄</span>
                 </button>
                 <label className="amount-field">
@@ -173,13 +173,13 @@ export default function Home() {
                 <button className="token-select" type="button" onClick={reversePair}>
                   {toToken === "ETH"
                     ? <img src="/assets/asset_04.png" alt="" />
-                    : <img className="landing-usdt-icon" src="https://cdn.simpleicons.org/tether/26A17B" alt="" />}
+                    : <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />}
                   {toToken} <span>⌄</span>
                 </button>
                 <div className="amount-field output">
                   <strong>{output}</strong>
                   <small>
-                    {toToken === "USDT"
+                    {toToken === "USDC"
                       ? `$${output}`
                       : `$${((Number.parseFloat(output.replaceAll(",", "")) || 0) * 2543.71).toLocaleString("en-US", { maximumFractionDigits: 2 })} `}
                   </small>
@@ -190,7 +190,7 @@ export default function Home() {
             <div className="route-summary">
               {Number(amount) > 0 && (
                 <>
-                  <div className="route-detail"><span>Rate</span><span>1 ETH = 2,543.71 USDT</span></div>
+                  <div className="route-detail"><span>Rate</span><span>1 ETH = 2,543.71 USDC</span></div>
                   <div className="route-detail"><span>Price impact</span><span>0.08%</span></div>
                   <div className="route-detail"><span>Minimum received</span><span>{(Number(output.replaceAll(",", "")) * 0.995).toLocaleString("en-US", { maximumFractionDigits: 2 })} {toToken}</span></div>
                   <div className="route-detail"><span>Network cost</span><span>$6.18</span></div>
@@ -266,8 +266,8 @@ export default function Home() {
             ))}
           </div>
           <div className="route-token route-destination">
-            <img className="landing-usdt-icon" src="https://cdn.simpleicons.org/tether/26A17B" alt="" />
-            <span>2,543.71 USDT</span>
+            <img className="landing-usdc-icon" src="/assets/asset_05.png" alt="" />
+            <span>2,543.71 USDC</span>
           </div>
           <div className="route-saving"><span>Quote status</span><strong>Ready</strong></div>
           <img className="route-mascot" src="/assets/character.png" alt="Dubu mascot" />

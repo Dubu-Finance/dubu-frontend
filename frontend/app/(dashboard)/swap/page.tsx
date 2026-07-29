@@ -44,6 +44,56 @@ function provider(): EthereumProvider | undefined {
 
 type Stage = "idle" | "quoting" | "approving" | "swapping";
 
+type TransactionReceipt = {
+  status?: string;
+  blockNumber?: string;
+  logs?: Array<{ address?: string; data?: string }>;
+};
+
+type TransactionFlow = {
+  action: "approval" | "swap";
+  state: "wallet" | "pending" | "success" | "failed" | "delayed";
+  hash?: string;
+  fromSymbol: TokenSymbol;
+  toSymbol?: TokenSymbol;
+  amountIn?: string;
+  amountOut?: string;
+  message?: string;
+};
+
+const wait = (milliseconds: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+async function waitForReceipt(hash: string): Promise<TransactionReceipt | null> {
+  const eth = provider();
+  if (!eth) throw new Error("Wallet provider unavailable");
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const receipt = await eth.request({
+      method: "eth_getTransactionReceipt",
+      params: [hash],
+    }) as TransactionReceipt | null;
+    if (receipt?.blockNumber) return receipt;
+    await wait(1_500);
+  }
+  return null;
+}
+
+function routeExecutionAmounts(receipt: TransactionReceipt) {
+  const routeLog = receipt.logs?.find(
+    (log) => log.address?.toLowerCase() === CONTRACTS.router.toLowerCase()
+      && (log.data?.length ?? 0) >= 2 + 64 * 5,
+  );
+  if (!routeLog?.data) return null;
+  const word = (index: number) =>
+    BigInt(`0x${routeLog.data?.slice(2 + index * 64, 2 + (index + 1) * 64)}`);
+  return { amountIn: word(1), amountOut: word(2) };
+}
+
+function receiptSucceeded(receipt: TransactionReceipt) {
+  return Boolean(receipt.status) && BigInt(receipt.status as string) === 1n;
+}
+
 function quoteErrorMessage(reason = "") {
   const normalized = reason.toLowerCase();
   if (normalized.includes("market") || normalized.includes("pair")) {
@@ -66,19 +116,20 @@ function walletErrorMessage(error: unknown, fallback: string) {
 export default function SwapPage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
 
-  const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDT");
+  const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDC");
   const [toToken, setToToken] = useState<TokenSymbol>("mWETH");
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
   const [pickerSide, setPickerSide] = useState<"from" | "to" | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const transactionBusyRef = useRef(false);
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [balances, setBalances] = useState<Partial<Record<TokenSymbol, bigint>>>({});
   const [approved, setApproved] = useState<bigint>(0n);
-  const [txHash, setTxHash] = useState<string | null>(null);
+  const [transaction, setTransaction] = useState<TransactionFlow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const inInfo = TOKENS[fromToken];
@@ -138,6 +189,7 @@ export default function SwapPage() {
   const abort = useRef<AbortController | null>(null);
 
   const runQuote = useCallback(async () => {
+    if (transactionBusyRef.current) return;
     abort.current?.abort();
     const tokenIn = inInfo.address;
     const tokenOut = outInfo.address;
@@ -213,27 +265,51 @@ export default function SwapPage() {
   const onApprove = useCallback(async () => {
     if (!quote) return;
     setError(null);
+    transactionBusyRef.current = true;
     setStage("approving");
+    setTransaction({
+      action: "approval",
+      state: "wallet",
+      fromSymbol: fromToken,
+      amountIn: fromBaseUnits(amountIn, inInfo.decimals, 8),
+    });
     try {
       const hash = await send({
         to: quote.approve.token,
         data: encodeApprove(quote.approve.spender, amountIn),
       });
-      setTxHash(hash);
-      // The wallet returns as soon as the node accepts it; the allowance changes a block later.
-      setTimeout(() => void refreshAccount(), 2_500);
+      setTransaction((current) => current ? { ...current, state: "pending", hash } : current);
+      const receipt = await waitForReceipt(hash);
+      if (!receipt) {
+        setTransaction((current) => current ? { ...current, state: "delayed" } : current);
+        return;
+      }
+      if (!receiptSucceeded(receipt)) {
+        setTransaction((current) => current ? {
+          ...current,
+          state: "failed",
+          message: "The approval transaction reverted.",
+        } : current);
+        return;
+      }
+      setTransaction((current) => current ? { ...current, state: "success" } : current);
+      await refreshAccount();
     } catch (e) {
-      setError(walletErrorMessage(e, "Approval wasn’t completed."));
+      const message = walletErrorMessage(e, "Approval wasn’t completed.");
+      setError(message);
+      setTransaction((current) => current ? { ...current, state: "failed", message } : current);
     } finally {
+      transactionBusyRef.current = false;
       setStage("idle");
     }
-  }, [quote, amountIn, send, refreshAccount]);
+  }, [quote, amountIn, send, refreshAccount, fromToken, inInfo.decimals]);
 
   const onSwap = useCallback(async () => {
     const tokenIn = inInfo.address;
     const tokenOut = outInfo.address;
     if (!quote || !tokenIn || !tokenOut) return;
     setError(null);
+    transactionBusyRef.current = true;
     setStage("swapping");
     try {
       // Re-quote before signing rather than sending what is on screen.
@@ -262,14 +338,53 @@ export default function SwapPage() {
         return;
       }
       setQuote(fresh);
+      const submittedAmountIn = fromBaseUnits(amountIn, inInfo.decimals, 8);
+      const expectedAmountOut = fromBaseUnits(BigInt(fresh.amountOut), outInfo.decimals, 8);
+      setTransaction({
+        action: "swap",
+        state: "wallet",
+        fromSymbol: fromToken,
+        toSymbol: toToken,
+        amountIn: submittedAmountIn,
+        amountOut: expectedAmountOut,
+      });
       const hash = await send({ to: fresh.route.to, data: fresh.route.data });
-      setTxHash(hash);
+      setTransaction((current) => current ? { ...current, state: "pending", hash } : current);
       setAmount("");
       setQuote(null);
-      setTimeout(() => void refreshAccount(), 2_500);
+      const receipt = await waitForReceipt(hash);
+      if (!receipt) {
+        setTransaction((current) => current ? { ...current, state: "delayed" } : current);
+        return;
+      }
+      if (!receiptSucceeded(receipt)) {
+        setTransaction((current) => current ? {
+          ...current,
+          state: "failed",
+          message: "The swap reverted before execution.",
+        } : current);
+        return;
+      }
+
+      const executed = routeExecutionAmounts(receipt);
+      setTransaction((current) => current ? {
+        ...current,
+        state: "success",
+        amountIn: executed
+          ? fromBaseUnits(executed.amountIn, inInfo.decimals, 8)
+          : submittedAmountIn,
+        amountOut: executed
+          ? fromBaseUnits(executed.amountOut, outInfo.decimals, 8)
+          : expectedAmountOut,
+      } : current);
+      await refreshAccount();
+      window.setTimeout(() => void refreshAccount(), 1_500);
     } catch (e) {
-      setError(walletErrorMessage(e, "Swap wasn’t completed."));
+      const message = walletErrorMessage(e, "Swap wasn’t completed.");
+      setError(message);
+      setTransaction((current) => current ? { ...current, state: "failed", message } : current);
     } finally {
+      transactionBusyRef.current = false;
       setStage("idle");
     }
   }, [
@@ -279,10 +394,12 @@ export default function SwapPage() {
     amountIn,
     address,
     slippageBps,
+    fromToken,
+    toToken,
     inInfo.address,
+    inInfo.decimals,
     outInfo.address,
     outInfo.decimals,
-    outInfo.symbol,
   ]);
 
   const reverse = () => {
@@ -300,7 +417,7 @@ export default function SwapPage() {
       <div className="dubu-token-dropdown" role="listbox" aria-label={`Select ${side} token`}>
         <div className="dubu-token-dropdown-head">
           <strong>Select token</strong>
-          <span>GIWA Sepolia</span>
+          <span>Available assets</span>
         </div>
         {TOKEN_LIST.map((token) => {
           const unavailable = token.symbol !== other && !hasMarket(token.symbol, other);
@@ -391,7 +508,7 @@ export default function SwapPage() {
   const primary = (() => {
     if (!connected) return { label: "Connect wallet", action: openWallet, disabled: false };
     if (!onGiwa)
-      return { label: "Switch to GIWA Sepolia", action: () => void switchToGiwa(), disabled: false };
+      return { label: "Switch network", action: () => void switchToGiwa(), disabled: false };
     if (!marketExists) return { label: "No market for this pair", action: () => {}, disabled: true };
     if (!marketConfigured) return { label: "Market setup pending", action: () => {}, disabled: true };
     if (amountIn <= 0n) return { label: "Enter an amount", action: () => {}, disabled: true };
@@ -582,19 +699,123 @@ export default function SwapPage() {
             {primary.label}
           </button>
 
-          {txHash && (
-            <a
-              className="dubu-txlink"
-              href={`${EXPLORER}/tx/${txHash}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View transaction ↗
-            </a>
-          )}
-
         </Panel>
       </div>
+
+      {transaction && (
+        <div className="app-modal-backdrop trade-status-backdrop" role="presentation">
+          <div
+            className={`app-modal trade-status-modal status-${transaction.state}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="trade-status-title"
+          >
+            {!["wallet", "pending"].includes(transaction.state) && (
+              <button
+                className="app-modal-close"
+                type="button"
+                aria-label="Close transaction status"
+                onClick={() => setTransaction(null)}
+              >
+                ×
+              </button>
+            )}
+
+            <div className="trade-status-visual" aria-hidden="true">
+              <span className="trade-status-ring" />
+              <span className="trade-status-ring ring-two" />
+              <i>
+                {transaction.state === "success"
+                  ? "✓"
+                  : transaction.state === "failed"
+                    ? "!"
+                    : transaction.state === "delayed"
+                      ? "…"
+                      : ""}
+              </i>
+              {transaction.state === "success" && (
+                <span className="trade-status-burst">
+                  <b /><b /><b /><b /><b /><b />
+                </span>
+              )}
+            </div>
+
+            <span className="trade-status-eyebrow">
+              {transaction.action === "swap" ? "Swap" : "Token approval"}
+            </span>
+            <h2 id="trade-status-title">
+              {transaction.state === "wallet"
+                ? "Confirm in your wallet"
+                : transaction.state === "pending"
+                  ? "Transaction submitted"
+                  : transaction.state === "success"
+                    ? transaction.action === "swap" ? "Swap complete" : "Token approved"
+                    : transaction.state === "delayed"
+                      ? "Still confirming"
+                      : "Transaction failed"}
+            </h2>
+            <p>
+              {transaction.state === "wallet"
+                ? "Review the details and approve the request in your wallet."
+                : transaction.state === "pending"
+                  ? "Your transaction is onchain and waiting for confirmation."
+                  : transaction.state === "success"
+                    ? transaction.action === "swap"
+                      ? "Your assets have been exchanged and the new balances are being refreshed."
+                      : "You can now continue with the swap."
+                    : transaction.state === "delayed"
+                      ? "Confirmation is taking longer than usual. The transaction is still submitted."
+                      : transaction.message ?? "The transaction could not be completed."}
+            </p>
+
+            <div className="trade-status-summary">
+              <div>
+                <span>{transaction.action === "swap" ? "You paid" : "Approved amount"}</span>
+                <strong>{transaction.amountIn ?? "—"} {transaction.fromSymbol}</strong>
+              </div>
+              {transaction.action === "swap" && transaction.toSymbol && (
+                <div>
+                  <span>{transaction.state === "success" ? "You received" : "Expected receive"}</span>
+                  <strong>{transaction.amountOut ?? "—"} {transaction.toSymbol}</strong>
+                </div>
+              )}
+            </div>
+
+            <ol className="trade-status-steps">
+              <li className={transaction.state === "wallet" ? "active" : transaction.state === "failed" && !transaction.hash ? "failed" : "done"}>
+                <i>{transaction.state === "wallet" ? "1" : transaction.state === "failed" && !transaction.hash ? "!" : "✓"}</i><span>Wallet request</span>
+              </li>
+              <li className={transaction.state === "wallet" ? "" : transaction.state === "failed" && transaction.hash ? "failed" : "done"}>
+                <i>{transaction.state === "wallet" ? "2" : transaction.state === "failed" && transaction.hash ? "!" : "✓"}</i><span>Submitted</span>
+              </li>
+              <li className={transaction.state === "success" ? "done" : transaction.state === "pending" || transaction.state === "delayed" ? "active" : ""}>
+                <i>{transaction.state === "success" ? "✓" : "3"}</i><span>Confirmed</span>
+              </li>
+            </ol>
+
+            {transaction.hash && (
+              <a
+                className="trade-status-explorer"
+                href={`${EXPLORER}/tx/${transaction.hash}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View transaction <span>↗</span>
+              </a>
+            )}
+
+            {["success", "failed", "delayed"].includes(transaction.state) && (
+              <button
+                className="app-primary-button trade-status-done"
+                type="button"
+                onClick={() => setTransaction(null)}
+              >
+                {transaction.state === "success" ? "Done" : "Back to swap"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

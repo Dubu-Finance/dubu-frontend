@@ -29,6 +29,36 @@ CREATE TABLE IF NOT EXISTS candles (
 CREATE INDEX IF NOT EXISTS candles_market_interval_time_idx
 ON candles (market_id, interval, open_time DESC);
 
+-- The deployed quote token at 0xd285...5155 is mUSDC. Older market-data
+-- builds labeled the same token as mUSDT, so migrate those internal IDs
+-- without discarding their candle history.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'candles_market_id_fkey'
+      AND conrelid = 'candles'::regclass
+      AND confupdtype <> 'c'
+  ) THEN
+    ALTER TABLE candles DROP CONSTRAINT candles_market_id_fkey;
+    ALTER TABLE candles
+      ADD CONSTRAINT candles_market_id_fkey
+      FOREIGN KEY (market_id) REFERENCES markets(id)
+      ON DELETE CASCADE
+      ON UPDATE CASCADE;
+  END IF;
+END
+$$;
+
+UPDATE markets
+SET
+  id = REPLACE(id, '-musdt', '-musdc'),
+  display_symbol = REPLACE(display_symbol, '/mUSDT', '/mUSDC'),
+  quote_token = 'mUSDC',
+  updated_at = NOW()
+WHERE id LIKE '%-musdt';
+
 CREATE TABLE IF NOT EXISTS backfill_runs (
   id UUID PRIMARY KEY,
   provider TEXT NOT NULL,

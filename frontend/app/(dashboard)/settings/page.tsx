@@ -46,7 +46,7 @@ export default function SettingsPage() {
               <div><strong>{shortAddress}</strong><span>Connected</span></div>
               <dl>
                 <div><dt>Balance</dt><dd>{ethBalance ?? "—"} ETH</dd></div>
-                <div><dt>Network</dt><dd><span className="giwa-chain-mark small">G</span> GIWA Sepolia</dd></div>
+                <div><dt>Network</dt><dd><span className="giwa-chain-mark small">G</span> Connected</dd></div>
               </dl>
               <button className="wallet-disconnect-button" type="button" onClick={disconnect}>Disconnect</button>
             </>
@@ -73,8 +73,8 @@ export default function SettingsPage() {
 
           <Panel className="settings-panel">
             <SectionTitle><span className="settings-title-icon">G</span> Network</SectionTitle>
-            <SettingRow label="Network" description="Dubu swaps are available on GIWA Sepolia.">
-              <span className="settings-static-value">GIWA Sepolia</span>
+            <SettingRow label="Network" description="Dubu swaps use the configured trading network.">
+              <span className="settings-static-value">Chain ID 91342</span>
             </SettingRow>
             <SettingRow label="Chain ID" description="Use this value when adding the network to a wallet.">
               <span className="settings-static-value">91342</span>

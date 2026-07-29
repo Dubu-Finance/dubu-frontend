@@ -205,7 +205,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           if (address) await readBalance(address, provider);
           return;
         } catch {
-          setWalletError("GIWA Sepolia could not be added to your wallet.");
+          setWalletError("The trading network could not be added to your wallet.");
           setWalletOpen(true);
           return;
         }
@@ -312,18 +312,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             <div className="app-topbar-actions">
-              {address && chainId && chainId !== GIWA_CHAIN_ID ? (
+              {address && chainId && chainId !== GIWA_CHAIN_ID && (
                 <button className="app-control app-network-button network-warning" type="button" onClick={() => void switchToGiwa()}>
                   <span className="giwa-chain-mark" aria-hidden="true">G</span>
-                  <span>Switch to GIWA</span>
+                  <span>Switch network</span>
                   <b>↗</b>
                 </button>
-              ) : (
-                <div className="app-control app-network-button network-fixed" aria-label="Connected network: GIWA Sepolia">
-                  <span className="giwa-chain-mark" aria-hidden="true">G</span>
-                  <span>GIWA Sepolia</span>
-                  <b className="network-live-dot" aria-hidden="true" />
-                </div>
               )}
 
               <button
@@ -369,7 +363,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   ? <span className="giwa-chain-mark">G</span>
                   : <img src="/assets/character.png" alt="" />}
               </div>
-              <h2 id="wallet-title">{address && chainId !== GIWA_CHAIN_ID ? "Switch to GIWA" : "Connect a wallet"}</h2>
+              <h2 id="wallet-title">{address && chainId !== GIWA_CHAIN_ID ? "Switch network" : "Connect a wallet"}</h2>
               <p>
                 {address && chainId !== GIWA_CHAIN_ID
                   ? "Switch networks to continue."
@@ -378,7 +372,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {address && chainId !== GIWA_CHAIN_ID ? (
                 <button className="wallet-provider-button" type="button" onClick={() => void switchToGiwa()}>
                   <span className="wallet-provider-icon"><span className="giwa-chain-mark small">G</span></span>
-                  <span><strong>GIWA Sepolia</strong><small>Chain ID 91342 · ETH gas</small></span>
+                  <span><strong>Trading network</strong><small>Chain ID 91342 · ETH gas</small></span>
                   <b>↗</b>
                 </button>
               ) : (
@@ -406,8 +400,8 @@ export function TokenIcon({ symbol }: { symbol: string }) {
     mWETH: "/assets/asset_04.png",
     WBTC: "/assets/wbtc.png",
     mWBTC: "/assets/wbtc.png",
-    USDT: "https://cdn.simpleicons.org/tether/26A17B",
-    mUSDT: "https://cdn.simpleicons.org/tether/26A17B",
+    USDC: "/assets/asset_05.png",
+    mUSDC: "/assets/asset_05.png",
     BNB: "https://cdn.simpleicons.org/binance/F3BA2F",
     mBNB: "https://cdn.simpleicons.org/binance/F3BA2F",
     XRP: "https://cdn.simpleicons.org/xrp/23292F",

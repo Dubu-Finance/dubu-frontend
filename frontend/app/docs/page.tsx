@@ -231,14 +231,14 @@ export default function DocsPage() {
             <div className="docs-section-heading">
               <div>
                 <span>NETWORK</span>
-                <h2>GIWA Sepolia</h2>
+                <h2>Network</h2>
               </div>
             </div>
-            <p>Dubu is available on GIWA Sepolia. ETH is used for network fees.</p>
+            <p>Dubu uses an EVM-compatible trading network. ETH is used for network fees.</p>
             <div className="docs-definition-list">
               <div><dt>Chain ID</dt><dd>91342</dd></div>
               <div><dt>Markets</dt><dd>{MARKETS.map((market) => `${market.base} / ${market.quote}`).join(" · ")}</dd></div>
-              <div><dt>mUSDT</dt><dd><code>{TOKENS.mUSDT.address ?? "Placeholder"}</code></dd></div>
+              <div><dt>mUSDC</dt><dd><code>{TOKENS.mUSDC.address ?? "Placeholder"}</code></dd></div>
               <div><dt>mWETH</dt><dd><code>{TOKENS.mWETH.address}</code></dd></div>
               <div><dt>mWBTC</dt><dd><code>{TOKENS.mWBTC.address}</code></dd></div>
               <div><dt>mBNB</dt><dd><code>{TOKENS.mBNB.address}</code></dd></div>

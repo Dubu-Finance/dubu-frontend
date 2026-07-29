@@ -58,7 +58,7 @@ export default function PortfolioPage() {
       return;
     }
     if (!onGiwa) {
-      setSearchStatus("Switch your browser wallet to GIWA Sepolia first.");
+      setSearchStatus("Switch to the trading network first.");
       return;
     }
 
@@ -87,7 +87,7 @@ export default function PortfolioPage() {
   return (
     <>
       <div className="wallet-portfolio-header">
-        <AppPageHeader title="Portfolio" description="Track wallet assets and onchain activity on GIWA Sepolia." />
+        <AppPageHeader title="Portfolio" description="Track wallet assets and onchain activity." />
         <form className="portfolio-address-search" onSubmit={inspectAddress}>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search wallet address" aria-label="Wallet address" />
           <button type="submit">View</button>
@@ -102,13 +102,13 @@ export default function PortfolioPage() {
           <div>
             <span>{inspectedAddress ? "Viewing address" : connected ? "Connected wallet" : "Portfolio"}</span>
             <strong>{shortAddress}</strong>
-            <small>{onGiwa ? "GIWA Sepolia" : connected ? "Unsupported network" : "Connect to begin"}</small>
+            <small>{onGiwa ? "Connected" : connected ? "Unsupported network" : "Connect to begin"}</small>
           </div>
         </div>
         <div className="wallet-total-value">
           <small>Estimated portfolio value</small>
           <strong>{visibleBalance ? `$${estimatedValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}</strong>
-          <span>GIWA Sepolia</span>
+          <span>Live balances</span>
         </div>
         <div className="wallet-overview-actions">
           {inspectedAddress ? (
@@ -116,7 +116,7 @@ export default function PortfolioPage() {
           ) : !connected ? (
             <button className="app-primary-button" type="button" onClick={openWallet}>Connect wallet</button>
           ) : !onGiwa ? (
-            <button className="app-primary-button" type="button" onClick={() => void switchToGiwa()}>Switch to GIWA</button>
+            <button className="app-primary-button" type="button" onClick={() => void switchToGiwa()}>Switch network</button>
           ) : (
             <span><i /> Updated from wallet</span>
           )}
@@ -171,7 +171,7 @@ export default function PortfolioPage() {
           <Panel className="wallet-assets-panel">
             <div className="wallet-assets-head">
               <div><h2>Tokens</h2><span>{visibleBalance ? "1 asset" : "0 assets"}</span></div>
-              <span>GIWA Sepolia</span>
+              <span>Onchain assets</span>
             </div>
             <div className="app-table-wrap">
               <table className="app-table wallet-assets-table">

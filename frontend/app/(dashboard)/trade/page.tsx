@@ -16,7 +16,7 @@ import {
   type StoredCandle,
 } from "@/app/lib/market-data";
 
-type PairKey = `${Exclude<TokenSymbol, "mUSDT">}/mUSDT`;
+type PairKey = `${Exclude<TokenSymbol, "mUSDC">}/mUSDC`;
 type OrderMode = "Market" | "Limit";
 type OrderTab = "Active" | "History";
 type ChartInterval = "5m" | "15m" | "1h" | "4h";
@@ -30,19 +30,19 @@ type MarketData = {
 type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 
 const pairs: Record<PairKey, {
-  base: Exclude<TokenSymbol, "mUSDT">;
-  quote: "mUSDT";
+  base: Exclude<TokenSymbol, "mUSDC">;
+  quote: "mUSDC";
   dataId: string | null;
 }> = {
-  "mWETH/mUSDT": { base: "mWETH", quote: "mUSDT", dataId: "mweth-musdt" },
-  "mWBTC/mUSDT": { base: "mWBTC", quote: "mUSDT", dataId: "mwbtc-musdt" },
-  "mBNB/mUSDT": { base: "mBNB", quote: "mUSDT", dataId: "mbnb-musdt" },
-  "mXRP/mUSDT": { base: "mXRP", quote: "mUSDT", dataId: "mxrp-musdt" },
-  "mSOL/mUSDT": { base: "mSOL", quote: "mUSDT", dataId: "msol-musdt" },
-  "mSKHY/mUSDT": { base: "mSKHY", quote: "mUSDT", dataId: null },
-  "mAAPL/mUSDT": { base: "mAAPL", quote: "mUSDT", dataId: null },
-  "mTSLA/mUSDT": { base: "mTSLA", quote: "mUSDT", dataId: null },
-  "mSPCX/mUSDT": { base: "mSPCX", quote: "mUSDT", dataId: null },
+  "mWETH/mUSDC": { base: "mWETH", quote: "mUSDC", dataId: "mweth-musdc" },
+  "mWBTC/mUSDC": { base: "mWBTC", quote: "mUSDC", dataId: "mwbtc-musdc" },
+  "mBNB/mUSDC": { base: "mBNB", quote: "mUSDC", dataId: "mbnb-musdc" },
+  "mXRP/mUSDC": { base: "mXRP", quote: "mUSDC", dataId: "mxrp-musdc" },
+  "mSOL/mUSDC": { base: "mSOL", quote: "mUSDC", dataId: "msol-musdc" },
+  "mSKHY/mUSDC": { base: "mSKHY", quote: "mUSDC", dataId: null },
+  "mAAPL/mUSDC": { base: "mAAPL", quote: "mUSDC", dataId: null },
+  "mTSLA/mUSDC": { base: "mTSLA", quote: "mUSDC", dataId: null },
+  "mSPCX/mUSDC": { base: "mSPCX", quote: "mUSDC", dataId: null },
 };
 
 const pairKeys = MARKETS.map((market) => `${market.base}/${market.quote}` as PairKey);
@@ -79,7 +79,7 @@ function decodeCandle(candle: StoredCandle): MarketCandle {
 
 export default function TradePage() {
   const { connected, onGiwa, openWallet, switchToGiwa } = useAppWallet();
-  const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDT");
+  const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
   const [pairMenuOpen, setPairMenuOpen] = useState(false);
   const pairMenuRef = useRef<HTMLDivElement>(null);
   const [interval, setInterval] = useState<ChartInterval>("15m");
@@ -297,7 +297,7 @@ export default function TradePage() {
   const actionLabel = !connected
     ? "Connect wallet"
     : !onGiwa
-      ? "Switch to GIWA"
+      ? "Switch network"
       : marketLoading
         ? "Loading market data"
       : !marketDataAvailable
@@ -330,7 +330,7 @@ export default function TradePage() {
                   onClick={() => setPairMenuOpen((current) => !current)}
                 >
                   <span className="terminal-pair-icons"><TokenIcon symbol={pair.base} /><TokenIcon symbol={pair.quote} /></span>
-                  <span><strong>{pairKey}</strong><small>GIWA Sepolia</small></span>
+                  <span><strong>{pairKey}</strong><small>Spot market</small></span>
                   <b>⌄</b>
                 </button>
                 {pairMenuOpen && (

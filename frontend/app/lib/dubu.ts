@@ -28,7 +28,7 @@ export const AGGREGATOR =
   process.env.NEXT_PUBLIC_DUBU_AGGREGATOR ?? "https://dubu-aggregator.polyrose.workers.dev";
 
 export type TokenSymbol =
-  | "mUSDT"
+  | "mUSDC"
   | "mWETH"
   | "mWBTC"
   | "mBNB"
@@ -49,17 +49,17 @@ export type TokenInfo = {
 };
 
 export type MarketInfo = {
-  base: Exclude<TokenSymbol, "mUSDT">;
-  quote: "mUSDT";
+  base: Exclude<TokenSymbol, "mUSDC">;
+  quote: "mUSDC";
   pairId: number | null;
   oracleExponent: number | null;
 };
 
 /** Deployed tokens and reserved placeholders for the next market rollout. */
 export const TOKENS: Record<TokenSymbol, TokenInfo> = {
-  mUSDT: {
-    symbol: "mUSDT",
-    name: "Tether USD",
+  mUSDC: {
+    symbol: "mUSDC",
+    name: "USD Coin",
     address: "0xd28596C6750D87C53EA146134AfAB53de86C5155",
     decimals: 6,
     tracks: "USD",
@@ -132,14 +132,14 @@ export const TOKENS: Record<TokenSymbol, TokenInfo> = {
 export const TOKEN_LIST = Object.values(TOKENS);
 
 export const MARKETS: MarketInfo[] = [
-  { base: "mWETH", quote: "mUSDT", pairId: 1, oracleExponent: null },
-  { base: "mWBTC", quote: "mUSDT", pairId: 2, oracleExponent: null },
-  { base: "mBNB", quote: "mUSDT", pairId: 3, oracleExponent: 24 },
-  { base: "mXRP", quote: "mUSDT", pairId: 4, oracleExponent: 15 },
-  { base: "mSOL", quote: "mUSDT", pairId: 5, oracleExponent: 16 },
-  { base: "mSKHY", quote: "mUSDT", pairId: null, oracleExponent: null },
-  { base: "mAAPL", quote: "mUSDT", pairId: null, oracleExponent: null },
-  { base: "mTSLA", quote: "mUSDT", pairId: null, oracleExponent: null },
+  { base: "mWETH", quote: "mUSDC", pairId: 1, oracleExponent: null },
+  { base: "mWBTC", quote: "mUSDC", pairId: 2, oracleExponent: null },
+  { base: "mBNB", quote: "mUSDC", pairId: 3, oracleExponent: 24 },
+  { base: "mXRP", quote: "mUSDC", pairId: 4, oracleExponent: 15 },
+  { base: "mSOL", quote: "mUSDC", pairId: 5, oracleExponent: 16 },
+  { base: "mSKHY", quote: "mUSDC", pairId: null, oracleExponent: null },
+  { base: "mAAPL", quote: "mUSDC", pairId: null, oracleExponent: null },
+  { base: "mTSLA", quote: "mUSDC", pairId: null, oracleExponent: null },
 ];
 
 export function hasMarket(a: TokenSymbol, b: TokenSymbol): boolean {

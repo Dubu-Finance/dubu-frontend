@@ -364,8 +364,8 @@
   transform: scale(0.78);
 }
 
-.token-icon-usdt,
-.token-icon-musdt,
+.token-icon-usdc,
+.token-icon-musdc,
 .token-icon-bnb,
 .token-icon-mbnb,
 .token-icon-xrp,
@@ -396,8 +396,8 @@
 }
 
 .token-weth { background: #202124; }
-.token-usdt { background: #42a891; }
-.token-musdt { background: #26a17b; }
+.token-usdc { background: #2775ca; }
+.token-musdc { background: #2775ca; }
 .token-mbnb { background: #e6a90b; color: #17120a; }
 .token-mxrp { background: #23292f; }
 .token-msol { background: linear-gradient(145deg, #9f6cff, #19d3a2); }
@@ -7139,3 +7139,287 @@
 .dubu-picker button strong { font-size: 12px; font-weight: 600; }
 .dubu-picker button small { color: var(--app-muted); font-size: 10px; }
 .dubu-picker button > span:last-child { font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Transaction lifecycle */
+.trade-status-backdrop {
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 38%),
+    rgba(29, 24, 19, 0.48);
+}
+
+.trade-status-modal {
+  width: min(100%, 470px);
+  padding: 38px 34px 30px;
+  overflow: hidden;
+  animation: trade-status-enter 280ms cubic-bezier(.2, .9, .2, 1) both;
+}
+
+.trade-status-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--app-accent), transparent);
+  opacity: 0.8;
+}
+
+.trade-status-visual {
+  position: relative;
+  width: 102px;
+  height: 102px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+}
+
+.trade-status-visual > i {
+  position: relative;
+  z-index: 2;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--app-accent-deep);
+  background: color-mix(in srgb, var(--app-accent) 16%, var(--app-surface-solid));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--app-accent) 22%, transparent);
+  font-size: 25px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.trade-status-ring {
+  position: absolute;
+  inset: 8px;
+  border: 2px solid color-mix(in srgb, var(--app-accent) 52%, transparent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: trade-status-spin 1.15s linear infinite;
+}
+
+.trade-status-ring.ring-two {
+  inset: 0;
+  border-width: 1px;
+  opacity: 0.4;
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+.status-success .trade-status-ring,
+.status-failed .trade-status-ring,
+.status-delayed .trade-status-ring {
+  animation: trade-status-ring-settle 420ms ease both;
+}
+
+.status-success .trade-status-visual > i {
+  color: #fff;
+  background: var(--app-success);
+  box-shadow: 0 14px 35px color-mix(in srgb, var(--app-success) 30%, transparent);
+  animation: trade-status-success-pop 500ms cubic-bezier(.2, 1.3, .4, 1) both;
+}
+
+.status-failed .trade-status-visual > i {
+  color: #fff;
+  background: var(--app-danger);
+}
+
+.status-delayed .trade-status-visual > i {
+  color: var(--app-text);
+  background: var(--app-soft);
+}
+
+.trade-status-burst {
+  position: absolute;
+  inset: 0;
+}
+
+.trade-status-burst b {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--app-success);
+  animation: trade-status-confetti 650ms ease-out both;
+}
+
+.trade-status-burst b:nth-child(1) { --burst-x: 46px; --burst-y: -37px; }
+.trade-status-burst b:nth-child(2) { --burst-x: -43px; --burst-y: -33px; animation-delay: 60ms; }
+.trade-status-burst b:nth-child(3) { --burst-x: 52px; --burst-y: 18px; animation-delay: 90ms; }
+.trade-status-burst b:nth-child(4) { --burst-x: -50px; --burst-y: 22px; animation-delay: 120ms; }
+.trade-status-burst b:nth-child(5) { --burst-x: 16px; --burst-y: 51px; animation-delay: 40ms; }
+.trade-status-burst b:nth-child(6) { --burst-x: -14px; --burst-y: -52px; animation-delay: 100ms; }
+
+.trade-status-eyebrow {
+  color: var(--app-accent-deep);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.trade-status-modal h2 {
+  margin-top: 8px;
+}
+
+.trade-status-modal > p {
+  max-width: 350px;
+  margin: 0 auto;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.trade-status-summary {
+  margin-top: 22px;
+  padding: 3px 16px;
+  border: 1px solid var(--app-line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--app-soft) 58%, transparent);
+}
+
+.trade-status-summary > div {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.trade-status-summary > div + div {
+  border-top: 1px solid var(--app-line);
+}
+
+.trade-status-summary span {
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.trade-status-summary strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-status-steps {
+  position: relative;
+  margin: 22px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  list-style: none;
+}
+
+.trade-status-steps::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 16.5%;
+  right: 16.5%;
+  height: 1px;
+  background: var(--app-line);
+}
+
+.trade-status-steps li {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: var(--app-muted);
+  font-size: 9px;
+}
+
+.trade-status-steps i {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  background: var(--app-surface-solid);
+  font-style: normal;
+}
+
+.trade-status-steps li.active i {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-accent) 12%, transparent);
+  animation: trade-status-pulse 1.2s ease-in-out infinite;
+}
+
+.trade-status-steps li.done {
+  color: var(--app-text);
+}
+
+.trade-status-steps li.done i {
+  border-color: var(--app-success);
+  color: #fff;
+  background: var(--app-success);
+}
+
+.trade-status-steps li.failed i {
+  border-color: var(--app-danger);
+  color: #fff;
+  background: var(--app-danger);
+}
+
+.trade-status-explorer {
+  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-accent-deep);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.trade-status-explorer:hover {
+  text-decoration: underline;
+}
+
+.trade-status-done {
+  width: 100%;
+  margin-top: 18px;
+}
+
+@keyframes trade-status-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes trade-status-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes trade-status-ring-settle {
+  from { transform: scale(0.84); opacity: 0.2; }
+  to { transform: scale(1); opacity: 0.42; }
+}
+
+@keyframes trade-status-success-pop {
+  0% { transform: scale(0.55); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes trade-status-confetti {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(0.3) rotate(0); }
+  to { opacity: 0; transform: translate(calc(-50% + var(--burst-x)), calc(-50% + var(--burst-y))) scale(1) rotate(150deg); }
+}
+
+@keyframes trade-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 10%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--app-accent) 4%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trade-status-modal,
+  .trade-status-ring,
+  .trade-status-visual > i,
+  .trade-status-burst b,
+  .trade-status-steps li.active i {
+    animation: none;
+  }
+}
