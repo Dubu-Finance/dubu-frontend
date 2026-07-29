@@ -7,25 +7,35 @@ function sleep(milliseconds) {
 }
 
 async function fetchJson(url, attempt = 1) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "Dubu-Market-Server/1.0",
-    },
-  });
-  if (response.ok) return response.json();
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Dubu-Market-Server/1.0",
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.ok) return response.json();
 
-  if ((response.status === 418 || response.status === 429 || response.status >= 500) && attempt < 5) {
-    const retryAfter = Number(response.headers.get("retry-after"));
-    const delay = Number.isFinite(retryAfter)
-      ? retryAfter * 1000
-      : Math.min(8000, 500 * 2 ** (attempt - 1));
-    await sleep(delay);
+    if (
+      (response.status === 418 || response.status === 429 || response.status >= 500)
+      && attempt < 5
+    ) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      const delay = Number.isFinite(retryAfter)
+        ? retryAfter * 1000
+        : Math.min(8000, 500 * 2 ** (attempt - 1));
+      await sleep(delay);
+      return fetchJson(url, attempt + 1);
+    }
+
+    const body = await response.text();
+    throw new Error(`Binance request failed (${response.status}): ${body.slice(0, 240)}`);
+  } catch (error) {
+    if (attempt >= 5) throw error;
+    await sleep(Math.min(8000, 500 * 2 ** (attempt - 1)));
     return fetchJson(url, attempt + 1);
   }
-
-  const body = await response.text();
-  throw new Error(`Binance request failed (${response.status}): ${body.slice(0, 240)}`);
 }
 
 export async function fetchBinanceCandles({

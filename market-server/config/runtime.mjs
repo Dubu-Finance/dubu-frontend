@@ -17,7 +17,7 @@ export function loadRuntimeConfig() {
   return {
     databaseUrl,
     host: process.env.MARKET_SERVER_HOST ?? "0.0.0.0",
-    port: readNumber(process.env.MARKET_SERVER_PORT, 4100),
+    port: readNumber(process.env.PORT ?? process.env.MARKET_SERVER_PORT, 4100),
     corsOrigins: (process.env.MARKET_CORS_ORIGINS ?? "http://localhost:3002,http://localhost:3000")
       .split(",")
       .map((origin) => origin.trim())

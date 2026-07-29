@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: dubu-market-server
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run market:server
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: MARKET_DATABASE_URL
+        sync: false
+      - key: MARKET_SERVER_HOST
+        value: 0.0.0.0
+      - key: MARKET_CORS_ORIGINS
+        value: https://dubu-frontend.vercel.app
+      - key: MARKET_BACKFILL_ON_START
+        value: "true"
+      - key: MARKET_BACKFILL_DAYS
+        value: "30"
