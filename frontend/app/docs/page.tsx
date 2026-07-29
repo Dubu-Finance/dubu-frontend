@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CONTRACTS, TOKENS } from "@/app/lib/dubu";
+import { CONTRACTS, MARKETS, TOKENS } from "@/app/lib/dubu";
 import "./docs.css";
 
 const docGroups = [
@@ -237,10 +237,13 @@ export default function DocsPage() {
             <p>Dubu is available on GIWA Sepolia. ETH is used for network fees.</p>
             <div className="docs-definition-list">
               <div><dt>Chain ID</dt><dd>91342</dd></div>
-              <div><dt>Supported markets</dt><dd>mWETH / mUSDC · mWBTC / mUSDC</dd></div>
-              <div><dt>mUSDC</dt><dd><code>{TOKENS.mUSDC.address}</code></dd></div>
+              <div><dt>Markets</dt><dd>{MARKETS.map((market) => `${market.base} / ${market.quote}`).join(" · ")}</dd></div>
+              <div><dt>mUSDT</dt><dd><code>{TOKENS.mUSDT.address ?? "Placeholder"}</code></dd></div>
               <div><dt>mWETH</dt><dd><code>{TOKENS.mWETH.address}</code></dd></div>
               <div><dt>mWBTC</dt><dd><code>{TOKENS.mWBTC.address}</code></dd></div>
+              <div><dt>mBNB</dt><dd><code>{TOKENS.mBNB.address}</code></dd></div>
+              <div><dt>mXRP</dt><dd><code>{TOKENS.mXRP.address}</code></dd></div>
+              <div><dt>mSOL</dt><dd><code>{TOKENS.mSOL.address}</code></dd></div>
               <div><dt>Router</dt><dd><code>{CONTRACTS.router}</code></dd></div>
             </div>
           </section>

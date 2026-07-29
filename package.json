@@ -1,0 +1,22 @@
+{
+  "name": "dubu-market-services",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "market:server": "node --env-file=.env.local market-server/index.mjs",
+    "db:up": "docker compose -f compose.market-data.yml up -d",
+    "db:down": "docker compose -f compose.market-data.yml down",
+    "db:migrate": "node --env-file=.env.local scripts/migrate-market-data.mjs",
+    "db:import:sqlite": "node --env-file=.env.local scripts/import-sqlite-to-postgres.mjs",
+    "db:backfill": "npm run db:migrate && node --env-file=.env.local scripts/backfill-binance.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.22.0",
+    "ws": "^8.18.0"
+  }
+}

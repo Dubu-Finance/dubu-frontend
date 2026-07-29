@@ -28,7 +28,7 @@ export const AGGREGATOR =
   process.env.NEXT_PUBLIC_DUBU_AGGREGATOR ?? "https://dubu-aggregator.polyrose.workers.dev";
 
 export type TokenSymbol =
-  | "mUSDC"
+  | "mUSDT"
   | "mWETH"
   | "mWBTC"
   | "mBNB"
@@ -42,17 +42,24 @@ export type TokenSymbol =
 export type TokenInfo = {
   symbol: TokenSymbol;
   name: string;
-  address: `0x${string}`;
+  address: `0x${string}` | null;
   decimals: number;
   /** Reference market used for pricing. */
   tracks: string;
 };
 
-/** The deployed token set. See `contracts/DEPLOYMENTS.md`. */
+export type MarketInfo = {
+  base: Exclude<TokenSymbol, "mUSDT">;
+  quote: "mUSDT";
+  pairId: number | null;
+  oracleExponent: number | null;
+};
+
+/** Deployed tokens and reserved placeholders for the next market rollout. */
 export const TOKENS: Record<TokenSymbol, TokenInfo> = {
-  mUSDC: {
-    symbol: "mUSDC",
-    name: "USD Coin",
+  mUSDT: {
+    symbol: "mUSDT",
+    name: "Tether USD",
     address: "0xd28596C6750D87C53EA146134AfAB53de86C5155",
     decimals: 6,
     tracks: "USD",
@@ -73,49 +80,49 @@ export const TOKENS: Record<TokenSymbol, TokenInfo> = {
   },
   mBNB: {
     symbol: "mBNB",
-    name: "Mock BNB",
+    name: "BNB",
     address: "0x54fbDB9F5bf1c345F0230773C66607DF3f7b99AC",
     decimals: 18,
     tracks: "BNBUSDT",
   },
   mXRP: {
     symbol: "mXRP",
-    name: "Mock XRP",
+    name: "XRP",
     address: "0x4Cbc341D56232805B258ed5a33C7b80dbF1A9d01",
     decimals: 6,
     tracks: "XRPUSDT",
   },
   mSOL: {
     symbol: "mSOL",
-    name: "Mock Solana",
+    name: "Solana",
     address: "0x1F96E44136D765802005c5083a51830841dca9b3",
     decimals: 9,
     tracks: "SOLUSDT",
   },
+  mSKHY: {
+    symbol: "mSKHY",
+    name: "SK hynix",
+    address: "0x37D1e1307eba9B489844B9A1198b5F77577630FD",
+    decimals: 8,
+    tracks: "SKHY",
+  },
   mAAPL: {
     symbol: "mAAPL",
-    name: "Mock Apple",
+    name: "Apple",
     address: "0xab3F1C8A9358Feb5872F81330FC811C3c53Ae9ff",
     decimals: 8,
     tracks: "AAPL",
   },
   mTSLA: {
     symbol: "mTSLA",
-    name: "Mock Tesla",
+    name: "Tesla",
     address: "0xf5456CF225efaf7807cBC14079733b211eAc84d7",
     decimals: 8,
     tracks: "TSLA",
   },
-  mSKHY: {
-    symbol: "mSKHY",
-    name: "Mock SK Hynix",
-    address: "0x37D1e1307eba9B489844B9A1198b5F77577630FD",
-    decimals: 8,
-    tracks: "SKHY",
-  },
   mSPCX: {
     symbol: "mSPCX",
-    name: "Mock SpaceX",
+    name: "SpaceX",
     address: "0x38EfEf195b347B9EcEf07185C716C9A93E232B9a",
     decimals: 8,
     tracks: "SPCX",
@@ -124,33 +131,28 @@ export const TOKENS: Record<TokenSymbol, TokenInfo> = {
 
 export const TOKEN_LIST = Object.values(TOKENS);
 
-/** Only these two pairs exist on chain. Anything else has no market and the aggregator says so. */
-/**
- * Markets the pool will actually quote.
- *
- * The equities are listed on chain -- pairs 6-9, tokens above -- and deliberately absent here. They
- * have no price: the updater builds its reference from Binance, OKX and Bybit, and none of the
- * three carries a share. A market that cannot be priced must not be offered, because the failure
- * would otherwise land on a user mid-swap rather than here.
- */
-export const MARKETS: Array<[TokenSymbol, TokenSymbol]> = [
-  ["mWETH", "mUSDC"],
-  ["mWBTC", "mUSDC"],
-  ["mBNB", "mUSDC"],
-  ["mXRP", "mUSDC"],
-  ["mSOL", "mUSDC"],
-];
-
-/** Listed on chain but not yet quotable, and why. Shown so the gap is visible rather than silent. */
-export const PENDING_MARKETS: Array<{ symbol: TokenSymbol; reason: string }> = [
-  { symbol: "mAAPL", reason: "no equity price feed yet" },
-  { symbol: "mTSLA", reason: "no equity price feed yet" },
-  { symbol: "mSKHY", reason: "no equity price feed yet" },
-  { symbol: "mSPCX", reason: "no equity price feed yet" },
+export const MARKETS: MarketInfo[] = [
+  { base: "mWETH", quote: "mUSDT", pairId: 1, oracleExponent: null },
+  { base: "mWBTC", quote: "mUSDT", pairId: 2, oracleExponent: null },
+  { base: "mBNB", quote: "mUSDT", pairId: 3, oracleExponent: 24 },
+  { base: "mXRP", quote: "mUSDT", pairId: 4, oracleExponent: 15 },
+  { base: "mSOL", quote: "mUSDT", pairId: 5, oracleExponent: 16 },
+  { base: "mSKHY", quote: "mUSDT", pairId: null, oracleExponent: null },
+  { base: "mAAPL", quote: "mUSDT", pairId: null, oracleExponent: null },
+  { base: "mTSLA", quote: "mUSDT", pairId: null, oracleExponent: null },
 ];
 
 export function hasMarket(a: TokenSymbol, b: TokenSymbol): boolean {
-  return MARKETS.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  return MARKETS.some(
+    ({ base, quote }) => (base === a && quote === b) || (base === b && quote === a),
+  );
+}
+
+export function isMarketConfigured(a: TokenSymbol, b: TokenSymbol): boolean {
+  const market = MARKETS.find(
+    ({ base, quote }) => (base === a && quote === b) || (base === b && quote === a),
+  );
+  return Boolean(market?.pairId && TOKENS[a].address && TOKENS[b].address);
 }
 
 export const CONTRACTS = {

@@ -404,17 +404,30 @@ export function TokenIcon({ symbol }: { symbol: string }) {
     ETH: "/assets/asset_04.png",
     WETH: "/assets/asset_04.png",
     mWETH: "/assets/asset_04.png",
-    USDC: "/assets/asset_05.png",
-    mUSDC: "/assets/asset_05.png",
     WBTC: "/assets/wbtc.png",
     mWBTC: "/assets/wbtc.png",
+    USDT: "https://cdn.simpleicons.org/tether/26A17B",
+    mUSDT: "https://cdn.simpleicons.org/tether/26A17B",
+    BNB: "https://cdn.simpleicons.org/binance/F3BA2F",
+    mBNB: "https://cdn.simpleicons.org/binance/F3BA2F",
+    XRP: "https://cdn.simpleicons.org/xrp/23292F",
+    mXRP: "https://cdn.simpleicons.org/xrp/23292F",
+    SOL: "https://cdn.simpleicons.org/solana/9945FF",
+    mSOL: "https://cdn.simpleicons.org/solana/9945FF",
+    SKHY: "https://upload.wikimedia.org/wikipedia/commons/2/24/SK_Hynix.svg",
+    mSKHY: "https://upload.wikimedia.org/wikipedia/commons/2/24/SK_Hynix.svg",
+    AAPL: "https://cdn.simpleicons.org/apple/555555",
+    mAAPL: "https://cdn.simpleicons.org/apple/555555",
+    TSLA: "https://cdn.simpleicons.org/tesla/E82127",
+    mTSLA: "https://cdn.simpleicons.org/tesla/E82127",
   };
 
   if (imageMap[symbol]) {
     return <img className={`token-icon token-icon-${symbol.toLowerCase()}`} src={imageMap[symbol]} alt="" />;
   }
 
-  const compact = symbol.slice(0, 2).toUpperCase();
+  const displaySymbol = symbol.startsWith("m") ? symbol.slice(1) : symbol;
+  const compact = displaySymbol.slice(0, 2).toUpperCase();
   return (
     <span className={`token-icon token-icon-css token-${symbol.toLowerCase()}`} aria-hidden="true">
       {compact}

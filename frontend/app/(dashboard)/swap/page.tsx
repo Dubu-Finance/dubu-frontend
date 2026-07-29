@@ -13,6 +13,7 @@ import {
   fetchQuote,
   fromBaseUnits,
   hasMarket,
+  isMarketConfigured,
   isQuoteError,
   toBaseUnits,
   type Quote,
@@ -65,7 +66,7 @@ function walletErrorMessage(error: unknown, fallback: string) {
 export default function SwapPage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
 
-  const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDC");
+  const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDT");
   const [toToken, setToToken] = useState<TokenSymbol>("mWETH");
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
@@ -84,6 +85,7 @@ export default function SwapPage() {
   const outInfo = TOKENS[toToken];
   const amountIn = useMemo(() => toBaseUnits(amount, inInfo.decimals), [amount, inInfo.decimals]);
   const marketExists = hasMarket(fromToken, toToken);
+  const marketConfigured = isMarketConfigured(fromToken, toToken);
 
   useEffect(() => {
     if (!pickerSide) return;
@@ -116,13 +118,16 @@ export default function SwapPage() {
     const owner = address as `0x${string}`;
     const entries = await Promise.all(
       TOKEN_LIST.map(
-        async (t) => [t.symbol, await balanceOf(t.address, owner).catch(() => 0n)] as const,
+        async (t) => [
+          t.symbol,
+          t.address ? await balanceOf(t.address, owner).catch(() => 0n) : 0n,
+        ] as const,
       ),
     );
     setBalances(Object.fromEntries(entries) as Partial<Record<TokenSymbol, bigint>>);
-    setApproved(
-      await allowance(inInfo.address, owner, CONTRACTS.router as `0x${string}`).catch(() => 0n),
-    );
+    setApproved(inInfo.address
+      ? await allowance(inInfo.address, owner, CONTRACTS.router as `0x${string}`).catch(() => 0n)
+      : 0n);
   }, [connected, address, inInfo.address]);
 
   useEffect(() => {
@@ -134,7 +139,9 @@ export default function SwapPage() {
 
   const runQuote = useCallback(async () => {
     abort.current?.abort();
-    if (amountIn <= 0n || !marketExists) {
+    const tokenIn = inInfo.address;
+    const tokenOut = outInfo.address;
+    if (amountIn <= 0n || !marketExists || !marketConfigured || !tokenIn || !tokenOut) {
       setQuote(null);
       setQuoteError(null);
       return;
@@ -144,8 +151,8 @@ export default function SwapPage() {
     setStage("quoting");
     try {
       const result = await fetchQuote({
-        tokenIn: inInfo.address,
-        tokenOut: outInfo.address,
+        tokenIn,
+        tokenOut,
         amountIn,
         // A quote is priced for a receiver and before a wallet is connected there is not one. The
         // placeholder produces an identical price; the calldata it comes back with is never used,
@@ -170,7 +177,15 @@ export default function SwapPage() {
     } finally {
       if (!controller.signal.aborted) setStage("idle");
     }
-  }, [amountIn, marketExists, inInfo.address, outInfo.address, address, slippageBps]);
+  }, [
+    amountIn,
+    marketExists,
+    marketConfigured,
+    inInfo.address,
+    outInfo.address,
+    address,
+    slippageBps,
+  ]);
 
   useEffect(() => {
     const id = setTimeout(() => void runQuote(), DEBOUNCE_MS);
@@ -215,7 +230,9 @@ export default function SwapPage() {
   }, [quote, amountIn, send, refreshAccount]);
 
   const onSwap = useCallback(async () => {
-    if (!quote) return;
+    const tokenIn = inInfo.address;
+    const tokenOut = outInfo.address;
+    if (!quote || !tokenIn || !tokenOut) return;
     setError(null);
     setStage("swapping");
     try {
@@ -230,8 +247,8 @@ export default function SwapPage() {
       // signed. Slippage tolerance is what the displayed minimum already encodes; this only stops
       // it being silently re-based on a newer, worse price.
       const fresh = await fetchQuote({
-        tokenIn: inInfo.address,
-        tokenOut: outInfo.address,
+        tokenIn,
+        tokenOut,
         amountIn,
         receiver: address as `0x${string}`,
         slippageBps,
@@ -310,6 +327,8 @@ export default function SwapPage() {
               <b>
                 {unavailable
                   ? "No market"
+                  : !token.address
+                    ? "Placeholder"
                   : connected
                     ? fromBaseUnits(balances[token.symbol] ?? 0n, token.decimals, 4)
                     : selected
@@ -374,6 +393,7 @@ export default function SwapPage() {
     if (!onGiwa)
       return { label: "Switch to GIWA Sepolia", action: () => void switchToGiwa(), disabled: false };
     if (!marketExists) return { label: "No market for this pair", action: () => {}, disabled: true };
+    if (!marketConfigured) return { label: "Market setup pending", action: () => {}, disabled: true };
     if (amountIn <= 0n) return { label: "Enter an amount", action: () => {}, disabled: true };
     if (insufficient) return { label: `Not enough ${fromToken}`, action: () => {}, disabled: true };
     if (stage === "quoting") return { label: "Finding best route…", action: () => {}, disabled: true };

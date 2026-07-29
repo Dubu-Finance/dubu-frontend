@@ -364,8 +364,46 @@
   transform: scale(0.78);
 }
 
+.token-icon-usdt,
+.token-icon-musdt,
+.token-icon-bnb,
+.token-icon-mbnb,
+.token-icon-xrp,
+.token-icon-mxrp,
+.token-icon-sol,
+.token-icon-msol,
+.token-icon-skhy,
+.token-icon-mskhy,
+.token-icon-aapl,
+.token-icon-maapl,
+.token-icon-tsla,
+.token-icon-mtsla {
+  padding: 6px;
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(28 31 36 / 7%);
+}
+
+.token-icon-skhy,
+.token-icon-mskhy {
+  padding: 4px 3px;
+}
+
+.token-icon-sol,
+.token-icon-msol {
+  padding: 5px;
+}
+
 .token-weth { background: #202124; }
 .token-usdt { background: #42a891; }
+.token-musdt { background: #26a17b; }
+.token-mbnb { background: #e6a90b; color: #17120a; }
+.token-mxrp { background: #23292f; }
+.token-msol { background: linear-gradient(145deg, #9f6cff, #19d3a2); }
+.token-mskhy { background: #ef672a; }
+.token-maapl { background: #4d5359; }
+.token-mtsla { background: #d92f3c; }
 .token-dai { background: #e8a51f; }
 .token-uni { background: #ec4a9a; }
 .token-wbtc { background: #ef992f; }
@@ -5135,13 +5173,18 @@
   gap: 16px;
 }
 
-.terminal-chart-panel,
 .terminal-orders-panel,
 .terminal-order-ticket {
   overflow: hidden;
 }
 
+.terminal-chart-panel {
+  overflow: visible;
+}
+
 .terminal-chart-head {
+  position: relative;
+  z-index: 4;
   min-height: 86px;
   padding: 14px 18px;
   display: flex;
@@ -5161,6 +5204,72 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
+}
+
+.terminal-pair-picker {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.terminal-pair-menu {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 0;
+  z-index: 55;
+  width: 310px;
+  max-height: 390px;
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--app-line);
+  border-radius: 15px;
+  background: var(--app-surface-solid);
+  box-shadow: 0 22px 60px rgba(48, 33, 19, 0.2);
+}
+
+.terminal-pair-menu > button {
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--app-text);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.terminal-pair-menu > button:hover,
+.terminal-pair-menu > button[aria-selected="true"] {
+  background: var(--app-soft);
+}
+
+.terminal-pair-menu > button > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.terminal-pair-menu > button strong {
+  font-size: 11px;
+}
+
+.terminal-pair-menu > button small,
+.terminal-pair-menu > button > b {
+  color: var(--app-muted);
+  font-size: 8px;
+}
+
+.terminal-pair-menu .terminal-pair-icons {
+  width: 42px;
+}
+
+.terminal-pair-menu .terminal-pair-icons .token-icon {
+  width: 27px;
+  height: 27px;
 }
 
 .terminal-pair-icons {
@@ -5205,6 +5314,10 @@
 }
 
 .terminal-price strong {
+  width: max-content;
+  margin: -3px -6px;
+  padding: 3px 6px;
+  border-radius: 7px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 22px;
   font-weight: 500;
@@ -5212,6 +5325,40 @@
 
 .terminal-price span {
   font-size: 9px;
+}
+
+.terminal-price.price-up strong {
+  animation: terminal-price-up 700ms ease-out;
+}
+
+.terminal-price.price-down strong {
+  animation: terminal-price-down 700ms ease-out;
+}
+
+@keyframes terminal-price-up {
+  0% {
+    color: #157b59;
+    background: rgb(21 123 89 / 16%);
+    text-shadow: 0 0 18px rgb(21 123 89 / 32%);
+  }
+  100% {
+    color: var(--app-text);
+    background: transparent;
+    text-shadow: none;
+  }
+}
+
+@keyframes terminal-price-down {
+  0% {
+    color: #c45b54;
+    background: rgb(196 91 84 / 15%);
+    text-shadow: 0 0 18px rgb(196 91 84 / 30%);
+  }
+  100% {
+    color: var(--app-text);
+    background: transparent;
+    text-shadow: none;
+  }
 }
 
 .terminal-price .positive {
@@ -5286,7 +5433,7 @@
 }
 
 .terminal-chart-toolbar > button:last-child {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .settings-static-value {
@@ -5303,6 +5450,27 @@
   background: #cc9459;
 }
 
+.terminal-chart-toolbar > .terminal-stream-status.live i {
+  background: var(--app-success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-success) 14%, transparent);
+  animation: terminal-live-pulse 1.8s ease-in-out infinite;
+}
+
+.terminal-chart-toolbar > .terminal-stream-status.connecting i,
+.terminal-chart-toolbar > .terminal-stream-status.reconnecting i {
+  background: #cc9459;
+}
+
+.terminal-chart-toolbar > .terminal-stream-status.idle i {
+  background: var(--app-muted);
+}
+
+@keyframes terminal-live-pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--app-success) 5%, transparent);
+  }
+}
+
 .terminal-chart {
   position: relative;
   min-height: 430px;
@@ -5310,6 +5478,31 @@
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--app-soft) 28%, transparent), transparent 34%),
     color-mix(in srgb, var(--app-surface-solid) 80%, transparent);
+}
+
+.terminal-market-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.terminal-market-empty > span {
+  font-size: 34px;
+}
+
+.terminal-market-empty strong {
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.terminal-market-empty p {
+  margin: 0;
+  font-size: 10px;
 }
 
 .terminal-grid-lines {
@@ -5323,6 +5516,63 @@
 .terminal-grid-lines i {
   display: block;
   border-top: 1px dashed color-mix(in srgb, var(--app-line) 72%, transparent);
+}
+
+.terminal-live-price-layer {
+  position: absolute;
+  z-index: 3;
+  inset: 18px 73px 40px 18px;
+  pointer-events: none;
+}
+
+.terminal-live-price-layer > div {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--app-accent) 64%, transparent);
+  transition: top 180ms linear;
+}
+
+.terminal-live-price-layer > div > i {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--app-accent-deep);
+}
+
+.terminal-live-price-layer > div > span {
+  position: absolute;
+  top: -9px;
+  right: -68px;
+  min-width: 62px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #fff;
+  background: var(--app-accent-deep);
+  font-size: 8px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.terminal-live-price-layer > div.price-up {
+  border-color: color-mix(in srgb, var(--app-success) 72%, transparent);
+}
+
+.terminal-live-price-layer > div.price-up > i,
+.terminal-live-price-layer > div.price-up > span {
+  background: var(--app-success);
+}
+
+.terminal-live-price-layer > div.price-down {
+  border-color: color-mix(in srgb, #c45b54 72%, transparent);
+}
+
+.terminal-live-price-layer > div.price-down > i,
+.terminal-live-price-layer > div.price-down > span {
+  background: #c45b54;
 }
 
 .terminal-candles {
@@ -6522,7 +6772,8 @@
   z-index: 45;
   width: 290px;
   padding: 8px;
-  overflow: hidden;
+  max-height: min(560px, calc(100vh - 180px));
+  overflow-y: auto;
   border: 1px solid var(--app-line);
   border-radius: 15px;
   background: var(--app-surface-solid);
@@ -6656,7 +6907,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dubu-token-dropdown,
-  .swap-price-updated {
+  .swap-price-updated,
+  .terminal-price.price-up strong,
+  .terminal-price.price-down strong,
+  .terminal-chart-toolbar > .terminal-stream-status.live i {
     animation: none;
   }
 }

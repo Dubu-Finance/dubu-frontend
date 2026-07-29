@@ -1,0 +1,22 @@
+services:
+  market-postgres:
+    image: postgres:17-alpine
+    container_name: dubu-market-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dubu_market
+      POSTGRES_USER: dubu
+      POSTGRES_PASSWORD: dubu_local
+    ports:
+      - "54329:5432"
+    volumes:
+      - dubu-market-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dubu -d dubu_market"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dubu-market-postgres:
+    name: frontend_dubu-market-postgres

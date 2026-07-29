@@ -5,13 +5,28 @@ a UniV2 pool, and an RFQ maker, plus the design and pitch material around it.
 
 ## Layout
 
-| Path        | What lives there                                                                |
-| ----------- | ------------------------------------------------------------------------------- |
-| `frontend/` | The web app: Next.js on [vinext](https://github.com/cloudflare/vinext)/Cloudflare Workers. See [frontend/STARTER.md](frontend/STARTER.md) for the starter's own notes. |
-| `assets/`   | Source images and exports used by the app and the deck.                          |
-| `pitch/`    | Deck and wireframes.                                                             |
+| Path             | What lives there                                                                |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `frontend/`      | The vinext web app. It consumes the market server and contains no indexer code. |
+| `market-server/` | One Node.js service for backfill, live indexing, REST, and WebSocket delivery.  |
+| `db/`            | PostgreSQL market-data schema.                                                  |
+| `scripts/`       | Database migration, import, and manual backfill commands.                       |
+| `assets/`        | Source images and exports used by the app and the deck.                         |
+| `pitch/`         | Deck and wireframes.                                                            |
 
 Anything that is not the web app belongs beside `frontend/`, not inside it.
+
+## Running market data
+
+```bash
+npm install
+npm run db:up
+npm run market:server
+```
+
+The market server listens on `http://localhost:4100`. It catches PostgreSQL up
+to the latest completed candle, keeps indexing live data, serves chart
+snapshots over REST, and publishes price and candle updates over WebSocket.
 
 ## Running the frontend
 
