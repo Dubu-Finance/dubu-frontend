@@ -123,6 +123,8 @@ export default function SwapPage() {
   const [pickerSide, setPickerSide] = useState<"from" | "to" | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const transactionBusyRef = useRef(false);
+  const quoteRef = useRef<Quote | null>(null);
+  const quoteKeyRef = useRef("");
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -164,7 +166,7 @@ export default function SwapPage() {
   }, []);
 
   // --- balances and allowance -------------------------------------------------------------
-  const refreshAccount = useCallback(async () => {
+  const refreshAccount = useCallback(async (minimumAllowance = 0n) => {
     if (!connected || !address) return;
     const owner = address as `0x${string}`;
     const entries = await Promise.all(
@@ -176,9 +178,10 @@ export default function SwapPage() {
       ),
     );
     setBalances(Object.fromEntries(entries) as Partial<Record<TokenSymbol, bigint>>);
-    setApproved(inInfo.address
+    const onchainAllowance = inInfo.address
       ? await allowance(inInfo.address, owner, CONTRACTS.router as `0x${string}`).catch(() => 0n)
-      : 0n);
+      : 0n;
+    setApproved(onchainAllowance >= minimumAllowance ? onchainAllowance : minimumAllowance);
   }, [connected, address, inInfo.address]);
 
   useEffect(() => {
@@ -187,6 +190,20 @@ export default function SwapPage() {
 
   // --- quoting ----------------------------------------------------------------------------
   const abort = useRef<AbortController | null>(null);
+  const quoteContextKey = [
+    inInfo.address ?? "",
+    outInfo.address ?? "",
+    amountIn.toString(),
+    address,
+    slippageBps,
+  ].join(":");
+
+  useEffect(() => {
+    quoteRef.current = null;
+    quoteKeyRef.current = "";
+    setQuote(null);
+    setQuoteError(null);
+  }, [quoteContextKey]);
 
   const runQuote = useCallback(async () => {
     if (transactionBusyRef.current) return;
@@ -194,13 +211,17 @@ export default function SwapPage() {
     const tokenIn = inInfo.address;
     const tokenOut = outInfo.address;
     if (amountIn <= 0n || !marketExists || !marketConfigured || !tokenIn || !tokenOut) {
+      quoteRef.current = null;
+      quoteKeyRef.current = "";
       setQuote(null);
       setQuoteError(null);
       return;
     }
+    const isBackgroundRefresh = quoteRef.current !== null
+      && quoteKeyRef.current === quoteContextKey;
     const controller = new AbortController();
     abort.current = controller;
-    setStage("quoting");
+    if (!isBackgroundRefresh) setStage("quoting");
     try {
       const result = await fetchQuote({
         tokenIn,
@@ -215,19 +236,29 @@ export default function SwapPage() {
       });
       if (controller.signal.aborted) return;
       if (isQuoteError(result)) {
-        setQuote(null);
+        if (!isBackgroundRefresh) {
+          quoteRef.current = null;
+          quoteKeyRef.current = "";
+          setQuote(null);
+        }
         setQuoteError(quoteErrorMessage(`${result.error} ${result.detail ?? ""}`));
       } else {
+        quoteRef.current = result;
+        quoteKeyRef.current = quoteContextKey;
         setQuote(result);
         setQuoteError(null);
       }
     } catch (e) {
       if (!controller.signal.aborted) {
-        setQuote(null);
+        if (!isBackgroundRefresh) {
+          quoteRef.current = null;
+          quoteKeyRef.current = "";
+          setQuote(null);
+        }
         setQuoteError(quoteErrorMessage(e instanceof Error ? e.message : ""));
       }
     } finally {
-      if (!controller.signal.aborted) setStage("idle");
+      if (!controller.signal.aborted && !isBackgroundRefresh) setStage("idle");
     }
   }, [
     amountIn,
@@ -237,6 +268,7 @@ export default function SwapPage() {
     outInfo.address,
     address,
     slippageBps,
+    quoteContextKey,
   ]);
 
   useEffect(() => {
@@ -292,8 +324,9 @@ export default function SwapPage() {
         } : current);
         return;
       }
+      setApproved((current) => current >= amountIn ? current : amountIn);
       setTransaction((current) => current ? { ...current, state: "success" } : current);
-      await refreshAccount();
+      await refreshAccount(amountIn);
     } catch (e) {
       const message = walletErrorMessage(e, "Approval wasn’t completed.");
       setError(message);
