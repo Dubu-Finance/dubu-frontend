@@ -161,6 +161,7 @@ export default function TradePage() {
       setStreamStatus("idle");
       return;
     }
+    const marketId = dataId;
 
     let active = true;
     const controller = new AbortController();
@@ -170,7 +171,7 @@ export default function TradePage() {
 
     async function loadMarketData() {
       try {
-        const payload = await fetchMarketSnapshot(dataId, interval, controller.signal);
+        const payload = await fetchMarketSnapshot(marketId, interval, controller.signal);
         if (!active || !payload.ticker) return;
 
         const nextPrice = Number(payload.ticker.lastPrice);
