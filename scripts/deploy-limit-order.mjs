@@ -4,15 +4,13 @@ import { compileLimitOrderContract } from "./lib/limit-order-contract.mjs";
 const rpcUrl = process.env.GIWA_RPC_URL ?? "https://sepolia-rpc.giwa.io";
 const privateKey = process.env.LIMIT_ORDER_DEPLOYER_PRIVATE_KEY;
 const router = process.env.DUBU_ROUTER_ADDRESS ?? "0x2B10D0b50ca3A7c0C7CCaBc969615b4Db3fb9471";
-const executor = process.env.LIMIT_ORDER_EXECUTOR_ADDRESS;
-const feeRecipient = process.env.LIMIT_ORDER_FEE_RECIPIENT ?? executor;
 
 if (!privateKey) throw new Error("LIMIT_ORDER_DEPLOYER_PRIVATE_KEY is required.");
-if (!executor) throw new Error("LIMIT_ORDER_EXECUTOR_ADDRESS is required.");
-if (!feeRecipient) throw new Error("LIMIT_ORDER_FEE_RECIPIENT is required.");
 
 const provider = new JsonRpcProvider(rpcUrl);
 const deployer = new Wallet(privateKey, provider);
+const executor = process.env.LIMIT_ORDER_EXECUTOR_ADDRESS ?? deployer.address;
+const feeRecipient = process.env.LIMIT_ORDER_FEE_RECIPIENT ?? executor;
 const artifact = await compileLimitOrderContract();
 const factory = new ContractFactory(artifact.abi, artifact.bytecode, deployer);
 

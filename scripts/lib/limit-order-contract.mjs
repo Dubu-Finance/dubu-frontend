@@ -14,6 +14,7 @@ export async function compileLimitOrderContract() {
       "DubuLimitOrderSettlement.sol": { content: source },
     },
     settings: {
+      viaIR: true,
       optimizer: { enabled: true, runs: 500 },
       outputSelection: {
         "*": {
