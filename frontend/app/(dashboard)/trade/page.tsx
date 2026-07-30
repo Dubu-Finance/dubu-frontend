@@ -404,7 +404,9 @@ export default function TradePage() {
     sequence: number;
   }>({ direction: "", sequence: 0 });
   const lastPriceRef = useRef<Record<string, number>>({});
-  const lastFillHashRef = useRef("");
+  const announcedFillHashesRef = useRef(new Set<string>());
+  const orderStatusesRef = useRef(new Map<string, LimitOrderRecord["status"]>());
+  const ordersHydratedRef = useRef(false);
   const fillNoticeTimerRef = useRef<number | null>(null);
 
   const pair = pairs[pairKey];
@@ -620,20 +622,67 @@ export default function TradePage() {
     return () => controller.abort();
   }, []);
 
-  const refreshOrders = useCallback(async () => {
+  const showFillNotice = useCallback((order: Partial<LimitOrderRecord>) => {
+    if (
+      !order.orderHash ||
+      announcedFillHashesRef.current.has(order.orderHash)
+    ) {
+      return;
+    }
+    const notice = fillNoticeFromOrder(order);
+    if (!notice) return;
+
+    announcedFillHashesRef.current.add(notice.orderHash);
+    setToast("");
+    setFillNotice(notice);
+    if (fillNoticeTimerRef.current !== null) {
+      window.clearTimeout(fillNoticeTimerRef.current);
+    }
+    fillNoticeTimerRef.current = window.setTimeout(() => {
+      setFillNotice(null);
+      fillNoticeTimerRef.current = null;
+    }, 7_000);
+  }, []);
+
+  const refreshOrders = useCallback(async ({
+    silent = false,
+  }: { silent?: boolean } = {}) => {
     if (!address) {
       setOrders([]);
       return;
     }
     const controller = new AbortController();
-    setOrdersLoading(true);
+    if (!silent) setOrdersLoading(true);
     try {
-      const nextOrders = await fetchLimitOrders(
+      const allOrders = await fetchLimitOrders(
         address,
-        orderTab === "Active" ? "active" : "history",
+        "all",
         controller.signal,
       );
-      setOrders(nextOrders);
+      const now = Date.now();
+      for (const order of allOrders) {
+        const previousStatus = orderStatusesRef.current.get(order.orderHash);
+        const recentlyFilled = order.filledAt
+          ? now - new Date(order.filledAt).getTime() < 30_000
+          : false;
+        if (
+          order.status === "filled" &&
+          (
+            previousStatus === "open" ||
+            previousStatus === "executing" ||
+            (!ordersHydratedRef.current && recentlyFilled)
+          )
+        ) {
+          showFillNotice(order);
+        }
+        orderStatusesRef.current.set(order.orderHash, order.status);
+      }
+      ordersHydratedRef.current = true;
+      setOrders(allOrders.filter((order) =>
+        orderTab === "Active"
+          ? order.status === "open" || order.status === "executing"
+          : order.status !== "open" && order.status !== "executing",
+      ));
       setOrderError((current) => current?.context === "orders" ? null : current);
     } catch (error) {
       setOrderError((current) =>
@@ -642,9 +691,15 @@ export default function TradePage() {
           : tradeError(error, "Your orders could not be loaded.", "orders"),
       );
     } finally {
-      setOrdersLoading(false);
+      if (!silent) setOrdersLoading(false);
     }
-  }, [address, orderTab]);
+  }, [address, orderTab, showFillNotice]);
+
+  useEffect(() => {
+    announcedFillHashesRef.current.clear();
+    orderStatusesRef.current.clear();
+    ordersHydratedRef.current = false;
+  }, [address]);
 
   useEffect(() => {
     void refreshOrders();
@@ -652,29 +707,27 @@ export default function TradePage() {
 
   useEffect(() => {
     if (!address) return;
-    return subscribeToOrders(address, (event) => {
-      if (
-        event.action === "filled" &&
-        event.data.orderHash &&
-        event.data.orderHash !== lastFillHashRef.current
-      ) {
-        const notice = fillNoticeFromOrder(event.data);
-        if (notice) {
-          lastFillHashRef.current = notice.orderHash;
-          setToast("");
-          setFillNotice(notice);
-          if (fillNoticeTimerRef.current !== null) {
-            window.clearTimeout(fillNoticeTimerRef.current);
-          }
-          fillNoticeTimerRef.current = window.setTimeout(() => {
-            setFillNotice(null);
-            fillNoticeTimerRef.current = null;
-          }, 7_000);
-        }
-      }
-      void refreshOrders();
-    });
+    const reconcile = () => void refreshOrders({ silent: true });
+    const intervalId = window.setInterval(reconcile, 3_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") reconcile();
+    };
+    window.addEventListener("focus", reconcile);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", reconcile);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [address, refreshOrders]);
+
+  useEffect(() => {
+    if (!address) return;
+    return subscribeToOrders(address, (event) => {
+      if (event.action === "filled") showFillNotice(event.data);
+      void refreshOrders({ silent: true });
+    });
+  }, [address, refreshOrders, showFillNotice]);
 
   useEffect(() => () => {
     if (fillNoticeTimerRef.current !== null) {
