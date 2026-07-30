@@ -9,7 +9,6 @@ import {
 } from "@/app/components/AppShell";
 import {
   EXPLORER,
-  MARKETS,
   MAX_APPROVAL,
   TOKENS,
   TOKEN_LIST,
@@ -92,7 +91,7 @@ const pairs: Record<PairKey, {
   "mTSLA/mUSDC": { base: "mTSLA", quote: "mUSDC", dataId: null },
 };
 
-const pairKeys = MARKETS.map((market) => `${market.base}/${market.quote}` as PairKey);
+const pairKeys = Object.keys(pairs) as PairKey[];
 
 function formatPrice(value: number) {
   return value.toLocaleString("en-US", {
