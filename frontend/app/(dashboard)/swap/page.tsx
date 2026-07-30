@@ -161,8 +161,8 @@ function SwapPageContent() {
     const rows = [
       {
         key: "prop",
-        label: "Dubu",
-        source: "AMM",
+        label: "Dubu Prop AMM",
+        source: "Onchain liquidity",
         out: BigInt(quote.detail.prop || "0"),
       },
       {

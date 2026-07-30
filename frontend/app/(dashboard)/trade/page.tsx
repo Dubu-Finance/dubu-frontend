@@ -1055,18 +1055,20 @@ export default function TradePage() {
   const marketActionLabel = !marketQuotable
     ? "Market setup pending"
     : !hasAmount
-      ? "Enter an amount"
+      ? `Enter amount to ${side.toLowerCase()} ${pair.base}`
     : insufficientBalance
       ? `Not enough ${paySymbol}`
     : marketSwap.stage === "quoting"
-      ? "Finding best route…"
+      ? `Finding best ${side.toLowerCase()} route…`
     : !marketSwap.quote
-      ? marketSwap.quoteError ? "No route" : "Enter an amount"
+      ? marketSwap.quoteError
+        ? "No route"
+        : `Enter amount to ${side.toLowerCase()} ${pair.base}`
     : marketSwap.needsApproval
       ? marketSwap.stage === "approving" ? "Approving…" : `Approve ${paySymbol}`
     : marketSwap.stage === "swapping"
-      ? "Confirm in wallet…"
-      : "Swap";
+      ? `Confirm ${side.toLowerCase()} in wallet…`
+      : `${side} ${pair.base}`;
   const actionLabel = !connected
     ? "Connect wallet"
     : !onGiwa
@@ -1088,14 +1090,14 @@ export default function TradePage() {
       : !marketDataAvailable
         ? "Market data pending"
       : !hasAmount
-        ? "Enter an amount"
+        ? `Enter amount to ${side.toLowerCase()} ${pair.base}`
       : limitAmountOut === 0n
-        ? "Enter a valid limit price"
+        ? `Enter a valid ${side.toLowerCase()} price`
       : insufficientBalance
         ? `Not enough ${paySymbol}`
       : needsSettlementApproval
         ? `Approve ${paySymbol}`
-        : "Review limit order";
+        : `Review ${side.toLowerCase()} order`;
   const actionDisabled = orderAction !== "idle" || (
     connected &&
     onGiwa &&
@@ -1392,7 +1394,7 @@ export default function TradePage() {
 
           <div className="terminal-order-field">
             <div>
-              <span>You pay</span>
+              <span>{side === "Buy" ? "You pay" : "You sell"}</span>
               <small>
                 Balance {connected
                   ? fromBaseUnits(payBalance, payToken.decimals, 5)
@@ -1414,8 +1416,12 @@ export default function TradePage() {
 
           <div className="terminal-order-field receive">
             <div>
-              <span>You receive</span>
-              <small>{mode === "Market" && marketSwap.quote ? "Live quote" : "Estimated"}</small>
+              <span>{side === "Buy" ? "You buy" : "You receive"}</span>
+              <small>
+                {mode === "Market" && marketSwap.quote
+                  ? `Live ${side.toLowerCase()} quote`
+                  : `Estimated ${side.toLowerCase()}`}
+              </small>
             </div>
             <label>
               <strong>{receiveDisplay}</strong>
@@ -1439,7 +1445,16 @@ export default function TradePage() {
 
           <dl className="terminal-order-summary">
             <div><dt>Reference price</dt><dd>{currentPrice === null ? "—" : `1 ${pair.base} = ${formatPrice(currentPrice)} ${pair.quote}`}</dd></div>
-            <div><dt>Execution condition</dt><dd>{mode === "Limit" ? `At ${limitPrice || "—"} ${pair.quote}` : "Best available route"}</dd></div>
+            <div>
+              <dt>Execution condition</dt>
+              <dd>
+                {mode === "Limit"
+                  ? side === "Buy"
+                    ? `Buy at ${limitPrice || "—"} ${pair.quote} or lower`
+                    : `Sell at ${limitPrice || "—"} ${pair.quote} or higher`
+                  : `Best available ${side.toLowerCase()} route`}
+              </dd>
+            </div>
             <div>
               <dt>{mode === "Limit" ? "Order fee cap" : "Minimum receive"}</dt>
               <dd>
@@ -1473,11 +1488,11 @@ export default function TradePage() {
         <div className="app-modal-backdrop" role="presentation">
           <div className="app-modal trade-review-modal" role="dialog" aria-modal="true" aria-labelledby="advanced-review-title">
             <button className="app-modal-close" type="button" aria-label="Close order review" onClick={() => setReviewOpen(false)}>×</button>
-            <span className="terminal-review-eyebrow">{mode} order</span>
-            <h2 id="advanced-review-title">Review order</h2>
+            <span className="terminal-review-eyebrow">{mode} {side.toLowerCase()} order</span>
+            <h2 id="advanced-review-title">Review {side.toLowerCase()} order</h2>
             <div className="terminal-review-pair"><TokenIcon symbol={pair.base} /><TokenIcon symbol={pair.quote} /><strong>{pairKey}</strong><span>{side}</span></div>
             <dl className="review-details">
-              <div><dt>You pay</dt><dd>{amount} {paySymbol}</dd></div>
+              <div><dt>{side === "Buy" ? "You pay" : "You sell"}</dt><dd>{amount} {paySymbol}</dd></div>
               <div><dt>Minimum receive</dt><dd>≥ {limitReceiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} {receiveSymbol}</dd></div>
               <div><dt>Execution</dt><dd>{mode === "Market" ? "Best available price" : `${formatPrice(executionPrice)} ${pair.quote}`}</dd></div>
               {mode === "Limit" && <div><dt>Expiry</dt><dd>{expiry}</dd></div>}
@@ -1517,7 +1532,7 @@ export default function TradePage() {
                 ? "Waiting for wallet…"
                 : orderAction === "submitting"
                   ? "Saving order…"
-                  : "Sign limit order"}
+                  : `Sign ${side.toLowerCase()} order`}
             </button>
           </div>
         </div>
