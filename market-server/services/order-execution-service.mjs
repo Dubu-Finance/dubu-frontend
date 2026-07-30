@@ -13,6 +13,10 @@ const SETTLEMENT_ABI = [
   "event OrderFilled(bytes32 indexed orderHash,address indexed maker,address indexed receiver,address tokenIn,address tokenOut,uint256 amountIn,uint256 grossAmountOut,uint256 netAmountOut,uint256 protocolFee,address executor)",
   "event OrderCancelled(bytes32 indexed orderHash,address indexed maker)",
 ];
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner,address spender) view returns (uint256)",
+];
 
 function contractOrder(order) {
   return {
@@ -137,6 +141,43 @@ export class OrderExecutionService {
     if (grossAmountOut - protocolFee < BigInt(order.minAmountOut)) {
       await this.repository.releaseOrder(order, {
         delayMs: 2_500,
+        quotedAmountOut: quote.amountOut,
+        venues,
+      });
+      return;
+    }
+
+    let makerBalance;
+    let settlementAllowance;
+    try {
+      const inputToken = new Contract(order.tokenIn, ERC20_ABI, this.provider);
+      [makerBalance, settlementAllowance] = await Promise.all([
+        inputToken.balanceOf(order.maker),
+        inputToken.allowance(order.maker, this.settlementAddress),
+      ]);
+    } catch (error) {
+      await this.repository.releaseOrder(order, {
+        delayMs: 5_000,
+        error: `Unable to verify token balance and approval: ${errorMessage(error)}`,
+        quotedAmountOut: quote.amountOut,
+        venues,
+      });
+      return;
+    }
+
+    if (makerBalance < BigInt(order.amountIn)) {
+      await this.repository.releaseOrder(order, {
+        delayMs: 10_000,
+        error: "Insufficient token balance for this active order.",
+        quotedAmountOut: quote.amountOut,
+        venues,
+      });
+      return;
+    }
+    if (settlementAllowance < BigInt(order.amountIn)) {
+      await this.repository.releaseOrder(order, {
+        delayMs: 5_000,
+        error: "Token approval is required before this order can fill.",
         quotedAmountOut: quote.amountOut,
         venues,
       });

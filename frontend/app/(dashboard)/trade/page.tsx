@@ -10,6 +10,7 @@ import {
 import {
   EXPLORER,
   MARKETS,
+  MAX_APPROVAL,
   TOKENS,
   TOKEN_LIST,
   allowance,
@@ -394,6 +395,7 @@ export default function TradePage() {
   const [fillNotice, setFillNotice] = useState<FillNotice | null>(null);
   const [payBalance, setPayBalance] = useState(0n);
   const [settlementAllowance, setSettlementAllowance] = useState(0n);
+  const [orderAllowances, setOrderAllowances] = useState<Record<string, bigint>>({});
   const [priceFlash, setPriceFlash] = useState<{
     direction: "up" | "down" | "";
     sequence: number;
@@ -686,6 +688,39 @@ export default function TradePage() {
     void refreshTradingAccount();
   }, [refreshTradingAccount]);
 
+  useEffect(() => {
+    if (!address || !orderConfig?.settlementAddress) {
+      setOrderAllowances({});
+      return;
+    }
+    const tokenAddresses = Array.from(new Set(
+      orders
+        .filter((order) => order.status === "open" || order.status === "executing")
+        .map((order) => order.tokenIn.toLowerCase()),
+    ));
+    if (tokenAddresses.length === 0) {
+      setOrderAllowances({});
+      return;
+    }
+
+    let active = true;
+    void Promise.all(
+      tokenAddresses.map(async (tokenAddress) => [
+        tokenAddress,
+        await allowance(
+          tokenAddress as `0x${string}`,
+          address as `0x${string}`,
+          orderConfig.settlementAddress as `0x${string}`,
+        ).catch(() => 0n),
+      ] as const),
+    ).then((entries) => {
+      if (active) setOrderAllowances(Object.fromEntries(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [address, orderConfig?.settlementAddress, orders]);
+
   function selectPair(next: PairKey) {
     setPairKey(next);
     setLimitPrice("");
@@ -710,17 +745,53 @@ export default function TradePage() {
         params: [{
           from: address,
           to: payToken.address,
-          data: encodeApprove(orderConfig.settlementAddress, amountIn),
+          data: encodeApprove(orderConfig.settlementAddress, MAX_APPROVAL),
           value: "0x0",
         }],
       }) as string;
       await waitForTransaction(hash);
-      setSettlementAllowance((current) => current >= amountIn ? current : amountIn);
-      await refreshTradingAccount(amountIn);
+      setSettlementAllowance(MAX_APPROVAL);
+      setOrderAllowances((current) => ({
+        ...current,
+        [payToken.address!.toLowerCase()]: MAX_APPROVAL,
+      }));
+      await refreshTradingAccount(MAX_APPROVAL);
       setToast(`${paySymbol} approved. Your limit order is ready to sign.`);
       window.setTimeout(() => setToast(""), 3_200);
     } catch (error) {
       setOrderError(tradeError(error, "Token approval was not completed."));
+    } finally {
+      setOrderAction("idle");
+    }
+  }
+
+  async function approveActiveOrder(order: LimitOrderRecord) {
+    const provider = ethereumProvider();
+    if (!provider || !address || !orderConfig?.settlementAddress) return;
+    const inputSymbol = symbolForOrderToken(order.tokenIn, TOKEN_LIST) ?? "mUSDC";
+    setOrderAction("approving");
+    setOrderError(null);
+    try {
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: address,
+          to: order.tokenIn,
+          data: encodeApprove(orderConfig.settlementAddress, MAX_APPROVAL),
+          value: "0x0",
+        }],
+      }) as string;
+      await waitForTransaction(hash);
+      const tokenKey = order.tokenIn.toLowerCase();
+      setOrderAllowances((current) => ({ ...current, [tokenKey]: MAX_APPROVAL }));
+      if (payToken.address?.toLowerCase() === tokenKey) {
+        setSettlementAllowance(MAX_APPROVAL);
+      }
+      setToast(`${inputSymbol} approved. The order is ready to fill.`);
+      window.setTimeout(() => setToast(""), 3_200);
+      window.setTimeout(() => void refreshOrders(), 3_500);
+    } catch (error) {
+      setOrderError(tradeError(error, "Token approval was not completed.", "orders"));
     } finally {
       setOrderAction("idle");
     }
@@ -1117,6 +1188,11 @@ export default function TradePage() {
                     inputToken.decimals,
                     6,
                   );
+                  const activeOrderAllowance = orderAllowances[order.tokenIn.toLowerCase()];
+                  const approvalRequired = orderTab === "Active"
+                    && order.status === "open"
+                    && activeOrderAllowance !== undefined
+                    && activeOrderAllowance < BigInt(order.amountIn);
                   const transactionHash = order.fillTxHash ?? order.executionTxHash;
                   return (
                     <div
@@ -1137,15 +1213,31 @@ export default function TradePage() {
                       <span>{inputAmount} {inputSymbol}</span>
                       <span>{formatPrice(Number(order.limitPrice))} {listedQuote}</span>
                       <div className="terminal-order-status">
-                        <span className={`status-${order.status}`}>{order.status}</span>
+                        <span className={approvalRequired ? "status-approval" : `status-${order.status}`}>
+                          {approvalRequired ? "Approval required" : order.status}
+                        </span>
                         {orderTab === "Active" && (
-                          <button
-                            type="button"
-                            disabled={orderAction !== "idle" || order.status !== "open"}
-                            onClick={() => void cancelOrder(order)}
-                          >
-                            {order.status === "executing" ? "Executing" : "Cancel"}
-                          </button>
+                          <div className="terminal-order-actions">
+                            {approvalRequired ? (
+                              <button
+                                className="approve"
+                                type="button"
+                                disabled={orderAction !== "idle"}
+                                title={`Approve ${inputSymbol} so this order can fill`}
+                                onClick={() => void approveActiveOrder(order)}
+                              >
+                                Approve
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={orderAction !== "idle" || order.status !== "open"}
+                                onClick={() => void cancelOrder(order)}
+                              >
+                                {order.status === "executing" ? "Executing" : "Cancel"}
+                              </button>
+                            )}
+                          </div>
                         )}
                         {orderTab === "History" && transactionHash && (
                           <a href={`${EXPLORER}/tx/${transactionHash}`} target="_blank" rel="noreferrer">
