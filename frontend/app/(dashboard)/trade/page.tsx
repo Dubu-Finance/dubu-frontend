@@ -153,6 +153,55 @@ function orderActionError(error: unknown, fallback: string) {
   return fallback;
 }
 
+function walletErrorCode(error: unknown) {
+  return typeof error === "object" && error && "code" in error
+    ? Number((error as { code?: unknown }).code)
+    : 0;
+}
+
+function canRetryTypedDataRequest(error: unknown) {
+  const code = walletErrorCode(error);
+  if (code === 4001 || code === -32002) return false;
+  const message = orderActionError(error, "").toLowerCase();
+  return (
+    code === -32601 ||
+    code === -32602 ||
+    message.includes("not supported") ||
+    message.includes("unsupported") ||
+    message.includes("invalid param")
+  );
+}
+
+async function requestTypedDataSignature(
+  provider: EthereumProvider,
+  account: string,
+  typedData: ReturnType<typeof limitOrderTypedData>,
+) {
+  const attempts: Array<{ method: string; payload: unknown }> = [
+    { method: "eth_signTypedData_v4", payload: JSON.stringify(typedData) },
+    { method: "eth_signTypedData_v4", payload: typedData },
+    { method: "eth_signTypedData_v3", payload: JSON.stringify(typedData) },
+  ];
+
+  let lastError: unknown;
+  for (const attempt of attempts) {
+    try {
+      const signature = await provider.request({
+        method: attempt.method,
+        params: [account, attempt.payload],
+      });
+      if (typeof signature !== "string" || !/^0x[a-fA-F0-9]{130}$/.test(signature)) {
+        throw new Error("The wallet did not return a valid order signature.");
+      }
+      return signature;
+    } catch (error) {
+      lastError = error;
+      if (!canRetryTypedDataRequest(error)) throw error;
+    }
+  }
+  throw lastError ?? new Error("This wallet does not support typed-data signatures.");
+}
+
 export default function TradePage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
@@ -524,10 +573,11 @@ export default function TradePage() {
         salt: randomOrderSalt(),
         maxFeeBps: "30",
       };
-      const signature = await provider.request({
-        method: "eth_signTypedData_v4",
-        params: [address, JSON.stringify(limitOrderTypedData(orderConfig, order))],
-      }) as string;
+      const signature = await requestTypedDataSignature(
+        provider,
+        address,
+        limitOrderTypedData(orderConfig, order),
+      );
       setOrderAction("submitting");
       const created = await createLimitOrder({
         marketId: pair.dataId,
