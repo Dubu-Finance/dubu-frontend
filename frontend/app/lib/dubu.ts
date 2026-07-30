@@ -131,15 +131,31 @@ export const TOKENS: Record<TokenSymbol, TokenInfo> = {
 
 export const TOKEN_LIST = Object.values(TOKENS);
 
+// Ordered by pairId, which is also the order the trade page lists them in.
+//
+// The four equity pairs were `pairId: null` until 2026-07-30 and mSPCX was missing from this list
+// entirely, so `isMarketConfigured` was false for all four and the UI said "Market setup pending".
+// That was accidentally telling the truth: the equity group had been latched down by the bleed
+// killswitch since 2026-07-29 and the aggregator answered 404 for every one of them, so filling
+// these ids in earlier would only have turned an honest "pending" into "a quote isn't available".
+// The latch is cleared and the pool quotes all four again (measured 13/16 requests filled), so the
+// ids are now safe to carry.
+//
+// Every id and exponent below is read from the chain, not from a deployment note: `pairId` is
+// confirmed against the aggregator's own `/markets`, and `oracleExponent` is word 12 of the pool's
+// `0x082af76c` snapshot -- the word index identified by requiring it to reproduce the three values
+// already known good here (pairs 3, 4 and 5). Pairs 1 and 2 were `null` and are simply what the
+// chain says; nothing reads this field today, so they are filled for accuracy rather than effect.
 export const MARKETS: MarketInfo[] = [
-  { base: "mWETH", quote: "mUSDC", pairId: 1, oracleExponent: null },
-  { base: "mWBTC", quote: "mUSDC", pairId: 2, oracleExponent: null },
+  { base: "mWETH", quote: "mUSDC", pairId: 1, oracleExponent: 24 },
+  { base: "mWBTC", quote: "mUSDC", pairId: 2, oracleExponent: 12 },
   { base: "mBNB", quote: "mUSDC", pairId: 3, oracleExponent: 24 },
   { base: "mXRP", quote: "mUSDC", pairId: 4, oracleExponent: 15 },
   { base: "mSOL", quote: "mUSDC", pairId: 5, oracleExponent: 16 },
-  { base: "mSKHY", quote: "mUSDC", pairId: null, oracleExponent: null },
-  { base: "mAAPL", quote: "mUSDC", pairId: null, oracleExponent: null },
-  { base: "mTSLA", quote: "mUSDC", pairId: null, oracleExponent: null },
+  { base: "mAAPL", quote: "mUSDC", pairId: 6, oracleExponent: 15 },
+  { base: "mTSLA", quote: "mUSDC", pairId: 7, oracleExponent: 15 },
+  { base: "mSKHY", quote: "mUSDC", pairId: 8, oracleExponent: 15 },
+  { base: "mSPCX", quote: "mUSDC", pairId: 9, oracleExponent: 15 },
 ];
 
 export function hasMarket(a: TokenSymbol, b: TokenSymbol): boolean {
