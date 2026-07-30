@@ -1474,6 +1474,169 @@
   background: var(--app-success);
 }
 
+.limit-fill-notice {
+  position: fixed;
+  z-index: 140;
+  right: 28px;
+  bottom: 28px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 18px 18px 17px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 13px;
+  overflow: hidden;
+  border: 1px solid rgba(48, 141, 77, 0.2);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--app-surface-solid) 94%, #e9fff2);
+  box-shadow: 0 24px 70px rgba(26, 92, 58, 0.2);
+  animation: limit-fill-enter 420ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.limit-fill-notice::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--app-success);
+  transform-origin: left;
+  animation: limit-fill-progress 7s linear both;
+}
+
+.limit-fill-icon {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.limit-fill-icon i {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(39, 174, 105, 0.35);
+  border-radius: 50%;
+  animation: limit-fill-ring 900ms ease-out both;
+}
+
+.limit-fill-icon span {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--app-success);
+  box-shadow: 0 8px 22px rgba(39, 174, 105, 0.24);
+  font-size: 17px;
+  font-weight: 800;
+  animation: limit-fill-check 480ms 120ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+
+.limit-fill-content {
+  min-width: 0;
+}
+
+.limit-fill-eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--app-success);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.limit-fill-content > strong {
+  display: block;
+  font-size: 15px;
+}
+
+.limit-fill-content > p {
+  margin: 3px 0 12px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.limit-fill-content > div {
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 10px;
+  background: rgba(39, 174, 105, 0.08);
+  font-size: 11px;
+}
+
+.limit-fill-content > div span {
+  color: var(--app-muted);
+}
+
+.limit-fill-content > div b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--app-text);
+}
+
+.limit-fill-content > a {
+  width: max-content;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--app-accent-deep);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.limit-fill-notice > button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--app-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.limit-fill-notice > button:hover {
+  color: var(--app-text);
+  background: var(--app-soft);
+}
+
+@keyframes limit-fill-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes limit-fill-check {
+  from { opacity: 0; transform: scale(0.45) rotate(-16deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes limit-fill-ring {
+  from { opacity: 0.75; transform: scale(0.62); }
+  to { opacity: 0; transform: scale(1.45); }
+}
+
+@keyframes limit-fill-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 /* Pools */
 .pool-stat-grid {
   display: grid;
@@ -6189,6 +6352,7 @@
 }
 
 .terminal-order-row {
+  position: relative;
   min-height: 68px;
   padding: 10px 18px;
   display: grid;
@@ -6197,6 +6361,16 @@
   gap: 12px;
   border-bottom: 1px solid var(--app-line);
   font-size: 11px;
+}
+
+.terminal-order-row.just-filled {
+  animation: terminal-order-filled 1.4s ease-out both;
+}
+
+@keyframes terminal-order-filled {
+  0% { background: rgba(39, 174, 105, 0.2); }
+  55% { background: rgba(39, 174, 105, 0.08); }
+  100% { background: transparent; }
 }
 
 .terminal-order-row > div:first-child {
@@ -6292,22 +6466,68 @@
   cursor: not-allowed;
 }
 
-.terminal-order-error,
-.terminal-ticket-error {
-  padding: 10px 13px;
-  color: var(--app-danger);
-  background: rgba(229, 79, 79, 0.07);
-  font-size: 10px;
-}
-
-.terminal-ticket-error {
+.trade-error-alert {
   margin-top: 10px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
   border: 1px solid rgba(229, 79, 79, 0.12);
-  border-radius: 10px;
+  border-radius: 12px;
+  color: var(--app-text);
+  background: rgba(229, 79, 79, 0.065);
 }
 
-.terminal-ticket-error.modal-error {
+.trade-error-alert.in-orders {
+  margin: 12px 14px;
+}
+
+.trade-error-alert.modal-error {
   margin: 14px 0 0;
+  text-align: left;
+}
+
+.trade-error-icon {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--app-danger);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.trade-error-alert strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.trade-error-alert p {
+  margin: 3px 0 0;
+  color: var(--app-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.trade-error-alert > button {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--app-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.trade-error-alert > button:hover {
+  color: var(--app-text);
+  background: rgba(229, 79, 79, 0.09);
 }
 
 .terminal-signing-status {
@@ -7290,6 +7510,13 @@
 }
 
 @media (max-width: 520px) {
+  .limit-fill-notice {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+  }
+
   .terminal-chart-head,
   .terminal-chart-toolbar {
     padding-right: 12px;
@@ -7349,6 +7576,16 @@
   .portfolio-value-chart {
     padding-right: 16px;
     padding-left: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .limit-fill-notice,
+  .limit-fill-notice::after,
+  .limit-fill-icon i,
+  .limit-fill-icon span,
+  .terminal-order-row.just-filled {
+    animation: none;
   }
 }
 

@@ -61,6 +61,20 @@ type EthereumProvider = {
 };
 
 type OrderActionState = "idle" | "approving" | "signing" | "submitting" | "cancelling";
+type TradeErrorState = {
+  title: string;
+  message: string;
+  context: "orders" | "ticket";
+};
+type FillNotice = {
+  orderHash: string;
+  pair: string;
+  side: "buy" | "sell";
+  received: string;
+  receivedSymbol: TokenSymbol;
+  executionPrice: number;
+  transactionHash: string | null;
+};
 
 const pairs: Record<PairKey, {
   base: TradeBaseSymbol;
@@ -153,6 +167,112 @@ function orderActionError(error: unknown, fallback: string) {
   return fallback;
 }
 
+function tradeError(
+  error: unknown,
+  fallback: string,
+  context: TradeErrorState["context"] = "ticket",
+): TradeErrorState {
+  const code = walletErrorCode(error);
+  const rawMessage = orderActionError(error, fallback);
+  const message = rawMessage.toLowerCase();
+
+  if (code === 4001 || message.includes("user rejected") || message.includes("user denied")) {
+    return {
+      title: "Request cancelled",
+      message: "Nothing was submitted. Review the order and try again when you’re ready.",
+      context,
+    };
+  }
+  if (code === -32002 || message.includes("already pending")) {
+    return {
+      title: "Check your wallet",
+      message: "A wallet request is already waiting. Open your wallet extension to continue.",
+      context,
+    };
+  }
+  if (message.includes("insufficient funds") || message.includes("not enough")) {
+    return {
+      title: "Insufficient balance",
+      message: "Your wallet does not have enough of this token, or enough gas, to complete the request.",
+      context,
+    };
+  }
+  if (message.includes("allowance") || message.includes("approve")) {
+    return {
+      title: "Token approval required",
+      message: "Approve the token for this order, then submit it again.",
+      context,
+    };
+  }
+  if (
+    message.includes("failed to fetch") ||
+    message.includes("network request") ||
+    message.includes("connection")
+  ) {
+    return {
+      title: "Connection interrupted",
+      message: "We couldn’t reach the trading service. Check your connection and try again.",
+      context,
+    };
+  }
+  if (message.includes("signature")) {
+    return {
+      title: "Signature not completed",
+      message: "The wallet did not return a valid order signature. Reopen your wallet and try again.",
+      context,
+    };
+  }
+  if (message.includes("revert") || message.includes("contract rejected")) {
+    return {
+      title: "Transaction could not be completed",
+      message: "The contract rejected this request. Refresh the quote and try again.",
+      context,
+    };
+  }
+  if (message.includes("unavailable") || message.includes("503")) {
+    return {
+      title: "Trading service unavailable",
+      message: "Limit orders are temporarily unavailable. Your funds remain in your wallet.",
+      context,
+    };
+  }
+
+  const cleanMessage = rawMessage
+    .replace(/^error:\s*/i, "")
+    .replace(/^execution reverted:?\s*/i, "")
+    .split(/\s+\(action=|,\s*transaction=|,\s*request=/i)[0]
+    .trim();
+  const safeMessage = cleanMessage && cleanMessage.length <= 180 && !cleanMessage.includes("{")
+    ? cleanMessage
+    : fallback;
+  return {
+    title: context === "orders" ? "Orders couldn’t be updated" : "Order not completed",
+    message: safeMessage,
+    context,
+  };
+}
+
+function TradeErrorAlert({
+  error,
+  onDismiss,
+  className = "",
+}: {
+  error: TradeErrorState;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`trade-error-alert ${className}`} role="alert">
+      <span className="trade-error-icon">!</span>
+      <div>
+        <strong>{error.title}</strong>
+        <p>{error.message}</p>
+      </div>
+      <button type="button" aria-label="Dismiss error" onClick={onDismiss}>×</button>
+    </div>
+  );
+}
+
 function walletErrorCode(error: unknown) {
   return typeof error === "object" && error && "code" in error
     ? Number((error as { code?: unknown }).code)
@@ -202,6 +322,53 @@ async function requestTypedDataSignature(
   throw lastError ?? new Error("This wallet does not support typed-data signatures.");
 }
 
+function fillNoticeFromOrder(order: Partial<LimitOrderRecord>): FillNotice | null {
+  if (
+    !order.orderHash ||
+    !order.marketId ||
+    !order.side ||
+    !order.tokenIn ||
+    !order.tokenOut ||
+    !order.actualAmountIn ||
+    !order.actualAmountOut
+  ) {
+    return null;
+  }
+  const inputSymbol = symbolForOrderToken(order.tokenIn, TOKEN_LIST);
+  const outputSymbol = symbolForOrderToken(order.tokenOut, TOKEN_LIST);
+  if (!inputSymbol || !outputSymbol) return null;
+
+  const listedPair = (Object.entries(pairs) as Array<
+    [PairKey, (typeof pairs)[PairKey]]
+  >).find(([, value]) => value.dataId === order.marketId)?.[0]
+    ?? `${outputSymbol}/${inputSymbol}`;
+  const inputAmount = Number(
+    fromBaseUnits(BigInt(order.actualAmountIn), TOKENS[inputSymbol].decimals, 8).replace(/,/g, ""),
+  );
+  const outputAmount = Number(
+    fromBaseUnits(BigInt(order.actualAmountOut), TOKENS[outputSymbol].decimals, 8).replace(/,/g, ""),
+  );
+  if (!Number.isFinite(inputAmount) || !Number.isFinite(outputAmount) || outputAmount <= 0) {
+    return null;
+  }
+
+  return {
+    orderHash: order.orderHash,
+    pair: listedPair,
+    side: order.side,
+    received: fromBaseUnits(
+      BigInt(order.actualAmountOut),
+      TOKENS[outputSymbol].decimals,
+      6,
+    ),
+    receivedSymbol: outputSymbol,
+    executionPrice: order.side === "buy"
+      ? inputAmount / outputAmount
+      : outputAmount / inputAmount,
+    transactionHash: order.fillTxHash ?? order.executionTxHash ?? null,
+  };
+}
+
 export default function TradePage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
@@ -222,8 +389,9 @@ export default function TradePage() {
   const [orderConfig, setOrderConfig] = useState<LimitOrderConfig | null>(null);
   const [orders, setOrders] = useState<LimitOrderRecord[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [orderError, setOrderError] = useState("");
+  const [orderError, setOrderError] = useState<TradeErrorState | null>(null);
   const [orderAction, setOrderAction] = useState<OrderActionState>("idle");
+  const [fillNotice, setFillNotice] = useState<FillNotice | null>(null);
   const [payBalance, setPayBalance] = useState(0n);
   const [settlementAllowance, setSettlementAllowance] = useState(0n);
   const [priceFlash, setPriceFlash] = useState<{
@@ -231,6 +399,8 @@ export default function TradePage() {
     sequence: number;
   }>({ direction: "", sequence: 0 });
   const lastPriceRef = useRef<Record<string, number>>({});
+  const lastFillHashRef = useRef("");
+  const fillNoticeTimerRef = useRef<number | null>(null);
 
   const pair = pairs[pairKey];
   const candles = useMemo(() => marketData?.candles.slice(-72) ?? [], [marketData]);
@@ -442,9 +612,13 @@ export default function TradePage() {
         controller.signal,
       );
       setOrders(nextOrders);
-      setOrderError("");
+      setOrderError((current) => current?.context === "orders" ? null : current);
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Orders could not be loaded.");
+      setOrderError((current) =>
+        current?.context === "ticket"
+          ? current
+          : tradeError(error, "Your orders could not be loaded.", "orders"),
+      );
     } finally {
       setOrdersLoading(false);
     }
@@ -456,8 +630,35 @@ export default function TradePage() {
 
   useEffect(() => {
     if (!address) return;
-    return subscribeToOrders(address, () => void refreshOrders());
+    return subscribeToOrders(address, (event) => {
+      if (
+        event.action === "filled" &&
+        event.data.orderHash &&
+        event.data.orderHash !== lastFillHashRef.current
+      ) {
+        const notice = fillNoticeFromOrder(event.data);
+        if (notice) {
+          lastFillHashRef.current = notice.orderHash;
+          setToast("");
+          setFillNotice(notice);
+          if (fillNoticeTimerRef.current !== null) {
+            window.clearTimeout(fillNoticeTimerRef.current);
+          }
+          fillNoticeTimerRef.current = window.setTimeout(() => {
+            setFillNotice(null);
+            fillNoticeTimerRef.current = null;
+          }, 7_000);
+        }
+      }
+      void refreshOrders();
+    });
   }, [address, refreshOrders]);
+
+  useEffect(() => () => {
+    if (fillNoticeTimerRef.current !== null) {
+      window.clearTimeout(fillNoticeTimerRef.current);
+    }
+  }, []);
 
   const refreshTradingAccount = useCallback(async (minimumAllowance = 0n) => {
     if (!address || !payToken.address) {
@@ -502,7 +703,7 @@ export default function TradePage() {
       amountIn === 0n
     ) return;
     setOrderAction("approving");
-    setOrderError("");
+    setOrderError(null);
     try {
       const hash = await provider.request({
         method: "eth_sendTransaction",
@@ -519,7 +720,7 @@ export default function TradePage() {
       setToast(`${paySymbol} approved. Your limit order is ready to sign.`);
       window.setTimeout(() => setToast(""), 3_200);
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Token approval was not completed.");
+      setOrderError(tradeError(error, "Token approval was not completed."));
     } finally {
       setOrderAction("idle");
     }
@@ -528,32 +729,56 @@ export default function TradePage() {
   async function submitLimitOrder() {
     const provider = ethereumProvider();
     if (!provider) {
-      setOrderError("No browser wallet was detected.");
+      setOrderError({
+        title: "Wallet not found",
+        message: "Install or unlock a browser wallet, then reconnect to continue.",
+        context: "ticket",
+      });
       return;
     }
     if (!address) {
-      setOrderError("Reconnect your wallet before signing this order.");
+      setOrderError({
+        title: "Wallet disconnected",
+        message: "Reconnect your wallet before signing this order.",
+        context: "ticket",
+      });
       return;
     }
     if (!onGiwa) {
-      setOrderError("Switch your wallet to the trading network before signing.");
+      setOrderError({
+        title: "Switch network",
+        message: "Switch your wallet to the supported network before signing this order.",
+        context: "ticket",
+      });
       return;
     }
     if (!pair.dataId || !payToken.address || !receiveToken.address) {
-      setOrderError("This market is not ready for limit orders.");
+      setOrderError({
+        title: "Market unavailable",
+        message: "Limit orders are not enabled for this pair yet.",
+        context: "ticket",
+      });
       return;
     }
     if (!orderConfig?.enabled || !orderConfig.settlementAddress) {
-      setOrderError("Limit-order settlement is temporarily unavailable.");
+      setOrderError({
+        title: "Limit orders unavailable",
+        message: "The settlement service is temporarily offline. Your funds remain in your wallet.",
+        context: "ticket",
+      });
       return;
     }
     if (amountIn === 0n || limitAmountOut === 0n) {
-      setOrderError("Enter a valid amount and limit price.");
+      setOrderError({
+        title: "Review order details",
+        message: "Enter a valid amount and limit price before continuing.",
+        context: "ticket",
+      });
       return;
     }
 
     setOrderAction("signing");
-    setOrderError("");
+    setOrderError(null);
     try {
       const accounts = await provider.request({ method: "eth_accounts" }) as string[];
       if (!accounts.some((account) => account.toLowerCase() === address.toLowerCase())) {
@@ -596,7 +821,7 @@ export default function TradePage() {
       setToast(`Limit order ${shortHash(created.orderHash)} is active.`);
       window.setTimeout(() => setToast(""), 3_200);
     } catch (error) {
-      setOrderError(orderActionError(error, "Limit order was not created."));
+      setOrderError(tradeError(error, "The limit order was not created."));
     } finally {
       setOrderAction("idle");
     }
@@ -606,7 +831,7 @@ export default function TradePage() {
     const provider = ethereumProvider();
     if (!provider || !address || !orderConfig?.settlementAddress) return;
     setOrderAction("cancelling");
-    setOrderError("");
+    setOrderError(null);
     try {
       const deadline = String(Math.floor(Date.now() / 1_000) + 5 * 60);
       const signature = await provider.request({
@@ -621,7 +846,7 @@ export default function TradePage() {
       window.setTimeout(() => setToast(""), 3_200);
       await refreshOrders();
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Order could not be cancelled.");
+      setOrderError(tradeError(error, "The order could not be cancelled."));
     } finally {
       setOrderAction("idle");
     }
@@ -631,7 +856,7 @@ export default function TradePage() {
     const provider = ethereumProvider();
     if (!provider || !address || !orderConfig?.settlementAddress) return;
     setOrderAction("cancelling");
-    setOrderError("");
+    setOrderError(null);
     try {
       const hash = await provider.request({
         method: "eth_sendTransaction",
@@ -647,7 +872,7 @@ export default function TradePage() {
       window.setTimeout(() => setToast(""), 3_200);
       window.setTimeout(() => void refreshOrders(), 5_000);
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Onchain cancellation failed.");
+      setOrderError(tradeError(error, "The onchain cancellation was not completed."));
     } finally {
       setOrderAction("idle");
     }
@@ -676,6 +901,7 @@ export default function TradePage() {
       void approveSettlement();
       return;
     }
+    setOrderError(null);
     setReviewOpen(true);
   }
 
@@ -868,7 +1094,13 @@ export default function TradePage() {
             <div className="terminal-order-columns" aria-hidden="true">
               <span>Pair / type</span><span>Amount</span><span>Price</span><span>Status</span>
             </div>
-            {orderError && <div className="terminal-order-error">{orderError}</div>}
+            {orderError?.context === "orders" && (
+              <TradeErrorAlert
+                error={orderError}
+                className="in-orders"
+                onDismiss={() => setOrderError(null)}
+              />
+            )}
             {orders.length > 0 ? (
               <div className="terminal-order-list">
                 {orders.map((order) => {
@@ -887,7 +1119,12 @@ export default function TradePage() {
                   );
                   const transactionHash = order.fillTxHash ?? order.executionTxHash;
                   return (
-                    <div className="terminal-order-row" key={order.id}>
+                    <div
+                      className={`terminal-order-row ${
+                        fillNotice?.orderHash === order.orderHash ? "just-filled" : ""
+                      }`}
+                      key={order.id}
+                    >
                       <div>
                         <span className={`terminal-order-side ${order.side}`}>
                           {order.side === "buy" ? "Buy" : "Sell"}
@@ -1013,7 +1250,12 @@ export default function TradePage() {
             <div><dt>Order fee cap</dt><dd>{mode === "Limit" ? "0.30%" : "Shown in Swap"}</dd></div>
           </dl>
 
-          {orderError && <div className="terminal-ticket-error">{orderError}</div>}
+          {orderError?.context === "ticket" && !reviewOpen && (
+            <TradeErrorAlert
+              error={orderError}
+              onDismiss={() => setOrderError(null)}
+            />
+          )}
           <button className="app-primary-button terminal-order-action" type="button" disabled={actionDisabled} onClick={handlePrimaryAction}>
             {actionLabel}
           </button>
@@ -1051,7 +1293,13 @@ export default function TradePage() {
                 </div>
               </div>
             )}
-            {orderError && <div className="terminal-ticket-error modal-error">{orderError}</div>}
+            {orderError?.context === "ticket" && (
+              <TradeErrorAlert
+                error={orderError}
+                className="modal-error"
+                onDismiss={() => setOrderError(null)}
+              />
+            )}
             <button
               className="app-primary-button"
               type="button"
@@ -1068,6 +1316,47 @@ export default function TradePage() {
         </div>
       )}
 
+      {fillNotice && (
+        <aside
+          className="limit-fill-notice"
+          role="status"
+          aria-live="assertive"
+          aria-label="Limit order filled"
+        >
+          <div className="limit-fill-icon" aria-hidden="true">
+            <i />
+            <span>✓</span>
+          </div>
+          <div className="limit-fill-content">
+            <span className="limit-fill-eyebrow">Limit order filled</span>
+            <strong>{fillNotice.pair}</strong>
+            <p>
+              {fillNotice.side === "buy" ? "Bought" : "Sold"} at{" "}
+              {formatPrice(fillNotice.executionPrice)} mUSDC
+            </p>
+            <div>
+              <span>Received</span>
+              <b>{fillNotice.received} {fillNotice.receivedSymbol}</b>
+            </div>
+            {fillNotice.transactionHash && (
+              <a
+                href={`${EXPLORER}/tx/${fillNotice.transactionHash}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View transaction <span>↗</span>
+              </a>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss fill notification"
+            onClick={() => setFillNotice(null)}
+          >
+            ×
+          </button>
+        </aside>
+      )}
       {toast && <Toast>{toast}</Toast>}
     </>
   );
