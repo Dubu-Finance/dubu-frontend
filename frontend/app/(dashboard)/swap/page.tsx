@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Panel, TokenIcon, useAppWallet } from "@/app/components/AppShell";
 import {
@@ -114,7 +114,7 @@ function walletErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export default function SwapPage() {
+function SwapPageContent() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const searchParams = useSearchParams();
 
@@ -871,5 +871,26 @@ export default function SwapPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SwapPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="trade-page swap-centered-page">
+          <div className="trade-stage">
+            <Panel className="dex-swap-card">
+              <div className="terminal-orders-empty">
+                <strong>Loading swap</strong>
+                <p>Preparing markets and wallet state…</p>
+              </div>
+            </Panel>
+          </div>
+        </div>
+      )}
+    >
+      <SwapPageContent />
+    </Suspense>
   );
 }
