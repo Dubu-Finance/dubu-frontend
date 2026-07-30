@@ -9,6 +9,8 @@
   "scripts": {
     "frontend:dev": "npm --prefix frontend run dev",
     "market:server": "node --env-file=.env.local market-server/index.mjs",
+    "limit:compile": "node scripts/compile-limit-order.mjs",
+    "limit:deploy": "node --env-file=.env.local scripts/deploy-limit-order.mjs",
     "db:up": "docker compose -f compose.market-data.yml up -d",
     "db:down": "docker compose -f compose.market-data.yml down",
     "db:migrate": "node --env-file=.env.local scripts/migrate-market-data.mjs",
@@ -16,7 +18,9 @@
     "db:backfill": "npm run db:migrate && node --env-file=.env.local scripts/backfill-binance.mjs"
   },
   "dependencies": {
+    "ethers": "^6.17.0",
     "pg": "^8.22.0",
+    "solc": "^0.8.30",
     "ws": "^8.18.0"
   }
 }

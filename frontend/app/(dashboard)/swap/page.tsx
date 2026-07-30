@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Panel, TokenIcon, useAppWallet } from "@/app/components/AppShell";
 import {
   CONTRACTS,
@@ -115,6 +116,7 @@ function walletErrorMessage(error: unknown, fallback: string) {
 
 export default function SwapPage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
+  const searchParams = useSearchParams();
 
   const [fromToken, setFromToken] = useState<TokenSymbol>("mUSDC");
   const [toToken, setToToken] = useState<TokenSymbol>("mWETH");
@@ -139,6 +141,25 @@ export default function SwapPage() {
   const amountIn = useMemo(() => toBaseUnits(amount, inInfo.decimals), [amount, inInfo.decimals]);
   const marketExists = hasMarket(fromToken, toToken);
   const marketConfigured = isMarketConfigured(fromToken, toToken);
+
+  useEffect(() => {
+    const requestedFrom = searchParams.get("from") as TokenSymbol | null;
+    const requestedTo = searchParams.get("to") as TokenSymbol | null;
+    const requestedAmount = searchParams.get("amount") ?? "";
+    if (
+      requestedFrom &&
+      requestedTo &&
+      TOKENS[requestedFrom] &&
+      TOKENS[requestedTo] &&
+      requestedFrom !== "mSPCX" &&
+      requestedTo !== "mSPCX" &&
+      hasMarket(requestedFrom, requestedTo)
+    ) {
+      setFromToken(requestedFrom);
+      setToToken(requestedTo);
+      if (/^\d*\.?\d*$/.test(requestedAmount)) setAmount(requestedAmount);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!pickerSide) return;

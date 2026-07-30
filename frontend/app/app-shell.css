@@ -6183,6 +6183,129 @@
   font-size: 11px;
 }
 
+.terminal-order-list {
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.terminal-order-row {
+  min-height: 68px;
+  padding: 10px 18px;
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr 0.8fr;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--app-line);
+  font-size: 11px;
+}
+
+.terminal-order-row > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.terminal-order-row p {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.terminal-order-row p strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.terminal-order-row p small {
+  color: var(--app-muted);
+  font-size: 9px;
+}
+
+.terminal-order-side {
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.terminal-order-side.buy {
+  color: #168653;
+  background: rgba(39, 174, 105, 0.1);
+}
+
+.terminal-order-side.sell {
+  color: #d44b4b;
+  background: rgba(229, 79, 79, 0.1);
+}
+
+.terminal-order-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.terminal-order-status > span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: var(--app-muted);
+  background: var(--app-soft);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.terminal-order-status > span.status-filled {
+  color: #168653;
+  background: rgba(39, 174, 105, 0.1);
+}
+
+.terminal-order-status > span.status-cancelled,
+.terminal-order-status > span.status-failed {
+  color: #c04b4b;
+  background: rgba(229, 79, 79, 0.09);
+}
+
+.terminal-order-status > span.status-executing {
+  color: var(--app-accent-deep);
+  background: rgba(203, 140, 72, 0.12);
+}
+
+.terminal-order-status button,
+.terminal-order-status a {
+  padding: 4px 6px;
+  border: 0;
+  color: var(--app-accent-deep);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.terminal-order-status button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.terminal-order-error,
+.terminal-ticket-error {
+  padding: 10px 13px;
+  color: var(--app-danger);
+  background: rgba(229, 79, 79, 0.07);
+  font-size: 10px;
+}
+
+.terminal-ticket-error {
+  margin-top: 10px;
+  border: 1px solid rgba(229, 79, 79, 0.12);
+  border-radius: 10px;
+}
+
 .terminal-order-ticket {
   position: sticky;
   top: 85px;
@@ -7070,6 +7193,16 @@
 
   .terminal-order-columns {
     display: none;
+  }
+
+  .terminal-order-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 14px;
+  }
+
+  .terminal-order-row > span:nth-child(2),
+  .terminal-order-row > span:nth-child(3) {
+    text-align: right;
   }
 
   .wallet-portfolio-header {

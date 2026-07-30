@@ -20,3 +20,21 @@ services:
         value: "true"
       - key: MARKET_BACKFILL_DAYS
         value: "30"
+      - key: GIWA_RPC_URL
+        value: https://sepolia-rpc.giwa.io
+      - key: DUBU_AGGREGATOR_URL
+        value: https://dubu-aggregator.polyrose.workers.dev
+      - key: LIMIT_ORDER_SETTLEMENT_ADDRESS
+        sync: false
+      - key: LIMIT_ORDER_EXECUTOR_PRIVATE_KEY
+        sync: false
+      - key: LIMIT_ORDER_POLL_MS
+        value: "3000"
+      - key: LIMIT_ORDER_BATCH_SIZE
+        value: "20"
+      - key: LIMIT_ORDER_ALLOW_RFQ
+        value: "false"
+      - key: LIMIT_ORDER_CONFIRMATIONS
+        value: "1"
+      - key: LIMIT_ORDER_START_BLOCK
+        sync: false

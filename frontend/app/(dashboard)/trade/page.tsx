@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Panel,
   Toast,
   TokenIcon,
   useAppWallet,
 } from "@/app/components/AppShell";
-import { MARKETS, type TokenSymbol } from "@/app/lib/dubu";
+import {
+  EXPLORER,
+  MARKETS,
+  TOKENS,
+  TOKEN_LIST,
+  allowance,
+  balanceOf,
+  encodeApprove,
+  fromBaseUnits,
+  toBaseUnits,
+  type TokenSymbol,
+} from "@/app/lib/dubu";
 import {
   fetchMarketSnapshot,
   subscribeToMarket,
@@ -15,6 +26,23 @@ import {
   type MarketTicker,
   type StoredCandle,
 } from "@/app/lib/market-data";
+import {
+  calculateLimitOutput,
+  cancelLimitOrder,
+  cancellationTypedData,
+  createLimitOrder,
+  encodeOnchainCancellation,
+  expiryTimestamp,
+  fetchLimitOrderConfig,
+  fetchLimitOrders,
+  limitOrderTypedData,
+  randomOrderSalt,
+  subscribeToOrders,
+  symbolForOrderToken,
+  type LimitOrderConfig,
+  type LimitOrderMessage,
+  type LimitOrderRecord,
+} from "@/app/lib/limit-orders";
 
 type TradeBaseSymbol = Exclude<TokenSymbol, "mUSDC" | "mSPCX">;
 type PairKey = `${TradeBaseSymbol}/mUSDC`;
@@ -27,6 +55,12 @@ type MarketData = {
   ticker: MarketTicker;
   candles: MarketCandle[];
 };
+
+type EthereumProvider = {
+  request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+type OrderActionState = "idle" | "approving" | "signing" | "submitting" | "cancelling";
 
 const pairs: Record<PairKey, {
   base: TradeBaseSymbol;
@@ -75,8 +109,37 @@ function decodeCandle(candle: StoredCandle): MarketCandle {
   };
 }
 
+function ethereumProvider() {
+  return typeof window === "undefined"
+    ? undefined
+    : (window as unknown as { ethereum?: EthereumProvider }).ethereum;
+}
+
+async function waitForTransaction(hash: string) {
+  const provider = ethereumProvider();
+  if (!provider) throw new Error("Wallet provider unavailable.");
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const receipt = await provider.request({
+      method: "eth_getTransactionReceipt",
+      params: [hash],
+    }) as { status?: string; blockNumber?: string } | null;
+    if (receipt?.blockNumber) {
+      if (receipt.status && BigInt(receipt.status) !== 1n) {
+        throw new Error("Transaction reverted.");
+      }
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+  }
+  throw new Error("Confirmation is taking longer than expected.");
+}
+
+function shortHash(value: string) {
+  return `${value.slice(0, 7)}…${value.slice(-5)}`;
+}
+
 export default function TradePage() {
-  const { connected, onGiwa, openWallet, switchToGiwa } = useAppWallet();
+  const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
   const [pairMenuOpen, setPairMenuOpen] = useState(false);
   const pairMenuRef = useRef<HTMLDivElement>(null);
@@ -92,6 +155,13 @@ export default function TradePage() {
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
+  const [orderConfig, setOrderConfig] = useState<LimitOrderConfig | null>(null);
+  const [orders, setOrders] = useState<LimitOrderRecord[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderError, setOrderError] = useState("");
+  const [orderAction, setOrderAction] = useState<OrderActionState>("idle");
+  const [payBalance, setPayBalance] = useState(0n);
+  const [settlementAllowance, setSettlementAllowance] = useState(0n);
   const [priceFlash, setPriceFlash] = useState<{
     direction: "up" | "down" | "";
     sequence: number;
@@ -131,14 +201,33 @@ export default function TradePage() {
   }, [candles, interval]);
   const numericAmount = Number.parseFloat(amount);
   const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
+  const paySymbol = side === "Buy" ? pair.quote : pair.base;
+  const receiveSymbol = side === "Buy" ? pair.base : pair.quote;
+  const payToken = TOKENS[paySymbol];
+  const receiveToken = TOKENS[receiveSymbol];
+  const amountIn = toBaseUnits(amount, payToken.decimals);
   const executionPrice = mode === "Limit"
     ? Number.parseFloat(limitPrice) || currentPrice || 0
     : currentPrice || 0;
-  const receiveAmount = hasAmount && executionPrice > 0
+  const estimatedMarketReceive = hasAmount && executionPrice > 0
     ? side === "Buy"
       ? numericAmount / executionPrice
       : numericAmount * executionPrice
     : 0;
+  const limitAmountOut = calculateLimitOutput({
+    side,
+    amountIn,
+    inputDecimals: payToken.decimals,
+    outputDecimals: receiveToken.decimals,
+    limitPrice,
+  });
+  const receiveAmount = mode === "Limit"
+    ? Number(fromBaseUnits(limitAmountOut, receiveToken.decimals, 8).replace(/,/g, ""))
+    : estimatedMarketReceive;
+  const insufficientBalance = connected && amountIn > payBalance;
+  const needsSettlementApproval = mode === "Limit"
+    && amountIn > 0n
+    && settlementAllowance < amountIn;
 
   useEffect(() => {
     if (!pairMenuOpen) return;
@@ -261,11 +350,221 @@ export default function TradePage() {
     setLimitPrice((value) => value || String(currentPrice));
   }, [currentPrice]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchLimitOrderConfig(controller.signal)
+      .then((config) => setOrderConfig(config))
+      .catch(() => setOrderConfig({
+        enabled: false,
+        chainId: 91_342,
+        settlementAddress: null,
+        supportedExpiries: ["1 day", "7 days", "30 days"],
+        maxFeeBps: 100,
+      }));
+    return () => controller.abort();
+  }, []);
+
+  const refreshOrders = useCallback(async () => {
+    if (!address) {
+      setOrders([]);
+      return;
+    }
+    const controller = new AbortController();
+    setOrdersLoading(true);
+    try {
+      const nextOrders = await fetchLimitOrders(
+        address,
+        orderTab === "Active" ? "active" : "history",
+        controller.signal,
+      );
+      setOrders(nextOrders);
+      setOrderError("");
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : "Orders could not be loaded.");
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [address, orderTab]);
+
+  useEffect(() => {
+    void refreshOrders();
+  }, [refreshOrders]);
+
+  useEffect(() => {
+    if (!address) return;
+    return subscribeToOrders(address, () => void refreshOrders());
+  }, [address, refreshOrders]);
+
+  const refreshTradingAccount = useCallback(async (minimumAllowance = 0n) => {
+    if (!address || !payToken.address) {
+      setPayBalance(0n);
+      setSettlementAllowance(0n);
+      return;
+    }
+    const [nextBalance, nextAllowance] = await Promise.all([
+      balanceOf(payToken.address, address as `0x${string}`).catch(() => 0n),
+      orderConfig?.settlementAddress
+        ? allowance(
+            payToken.address,
+            address as `0x${string}`,
+            orderConfig.settlementAddress,
+          ).catch(() => 0n)
+        : Promise.resolve(0n),
+    ]);
+    setPayBalance(nextBalance);
+    setSettlementAllowance(
+      nextAllowance >= minimumAllowance ? nextAllowance : minimumAllowance,
+    );
+  }, [address, orderConfig?.settlementAddress, payToken.address]);
+
+  useEffect(() => {
+    void refreshTradingAccount();
+  }, [refreshTradingAccount]);
+
   function selectPair(next: PairKey) {
     setPairKey(next);
     setLimitPrice("");
     setAmount("");
     setPairMenuOpen(false);
+  }
+
+  async function approveSettlement() {
+    const provider = ethereumProvider();
+    if (
+      !provider ||
+      !address ||
+      !payToken.address ||
+      !orderConfig?.settlementAddress ||
+      amountIn === 0n
+    ) return;
+    setOrderAction("approving");
+    setOrderError("");
+    try {
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: address,
+          to: payToken.address,
+          data: encodeApprove(orderConfig.settlementAddress, amountIn),
+          value: "0x0",
+        }],
+      }) as string;
+      await waitForTransaction(hash);
+      setSettlementAllowance((current) => current >= amountIn ? current : amountIn);
+      await refreshTradingAccount(amountIn);
+      setToast(`${paySymbol} approved. Your limit order is ready to sign.`);
+      window.setTimeout(() => setToast(""), 3_200);
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : "Token approval was not completed.");
+    } finally {
+      setOrderAction("idle");
+    }
+  }
+
+  async function submitLimitOrder() {
+    const provider = ethereumProvider();
+    if (
+      !provider ||
+      !address ||
+      !pair.dataId ||
+      !payToken.address ||
+      !receiveToken.address ||
+      !orderConfig?.enabled ||
+      !orderConfig.settlementAddress ||
+      amountIn === 0n ||
+      limitAmountOut === 0n
+    ) return;
+
+    setOrderAction("signing");
+    setOrderError("");
+    try {
+      const now = Math.floor(Date.now() / 1_000);
+      const order: LimitOrderMessage = {
+        maker: address as `0x${string}`,
+        receiver: address as `0x${string}`,
+        tokenIn: payToken.address,
+        tokenOut: receiveToken.address,
+        amountIn: amountIn.toString(),
+        minAmountOut: limitAmountOut.toString(),
+        validAfter: String(now),
+        expiry: String(expiryTimestamp(expiry)),
+        nonce: String(Date.now()),
+        salt: randomOrderSalt(),
+        maxFeeBps: "30",
+      };
+      const signature = await provider.request({
+        method: "eth_signTypedData_v4",
+        params: [address, JSON.stringify(limitOrderTypedData(orderConfig, order))],
+      }) as string;
+      setOrderAction("submitting");
+      const created = await createLimitOrder({
+        marketId: pair.dataId,
+        side: side.toLowerCase() as "buy" | "sell",
+        limitPrice,
+        order,
+        signature,
+      });
+      setReviewOpen(false);
+      setAmount("");
+      setToast(`Limit order ${shortHash(created.orderHash)} is active.`);
+      window.setTimeout(() => setToast(""), 3_200);
+      await refreshOrders();
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : "Limit order was not created.");
+    } finally {
+      setOrderAction("idle");
+    }
+  }
+
+  async function cancelOrder(order: LimitOrderRecord) {
+    const provider = ethereumProvider();
+    if (!provider || !address || !orderConfig?.settlementAddress) return;
+    setOrderAction("cancelling");
+    setOrderError("");
+    try {
+      const deadline = String(Math.floor(Date.now() / 1_000) + 5 * 60);
+      const signature = await provider.request({
+        method: "eth_signTypedData_v4",
+        params: [
+          address,
+          JSON.stringify(cancellationTypedData(orderConfig, order, deadline)),
+        ],
+      }) as string;
+      await cancelLimitOrder(order, deadline, signature);
+      setToast(`Order ${shortHash(order.orderHash)} cancelled.`);
+      window.setTimeout(() => setToast(""), 3_200);
+      await refreshOrders();
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : "Order could not be cancelled.");
+    } finally {
+      setOrderAction("idle");
+    }
+  }
+
+  async function cancelOrderOnchain(order: LimitOrderRecord) {
+    const provider = ethereumProvider();
+    if (!provider || !address || !orderConfig?.settlementAddress) return;
+    setOrderAction("cancelling");
+    setOrderError("");
+    try {
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: address,
+          to: orderConfig.settlementAddress,
+          data: encodeOnchainCancellation(order),
+          value: "0x0",
+        }],
+      }) as string;
+      await waitForTransaction(hash);
+      setToast(`Cancellation secured onchain: ${shortHash(hash)}.`);
+      window.setTimeout(() => setToast(""), 3_200);
+      window.setTimeout(() => void refreshOrders(), 5_000);
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : "Onchain cancellation failed.");
+    } finally {
+      setOrderAction("idle");
+    }
   }
 
   function handlePrimaryAction() {
@@ -277,29 +576,65 @@ export default function TradePage() {
       void switchToGiwa();
       return;
     }
+    if (mode === "Market") {
+      const query = new URLSearchParams({
+        from: paySymbol,
+        to: receiveSymbol,
+        amount,
+      });
+      window.location.assign(`/swap?${query}`);
+      return;
+    }
     if (!hasAmount || !marketDataAvailable) return;
+    if (needsSettlementApproval) {
+      void approveSettlement();
+      return;
+    }
     setReviewOpen(true);
   }
 
-  function submitOrder() {
-    setReviewOpen(false);
-    setToast(`${mode} order ready. Confirm in your wallet.`);
-    window.setTimeout(() => setToast(""), 3200);
-  }
-
-  const paySymbol = side === "Buy" ? pair.quote : pair.base;
-  const receiveSymbol = side === "Buy" ? pair.base : pair.quote;
   const actionLabel = !connected
     ? "Connect wallet"
     : !onGiwa
       ? "Switch network"
+      : mode === "Market"
+        ? "Open market swap"
+      : orderConfig === null
+        ? "Loading limit orders"
+      : !orderConfig.enabled
+        ? "Limit orders unavailable"
+      : orderAction === "approving"
+        ? `Approving ${paySymbol}…`
+      : orderAction === "signing"
+        ? "Confirm order signature…"
+      : orderAction === "submitting"
+        ? "Submitting order…"
       : marketLoading
         ? "Loading market data"
       : !marketDataAvailable
         ? "Market data pending"
       : !hasAmount
         ? "Enter an amount"
-        : `Review ${mode.toLowerCase()} order`;
+      : limitAmountOut === 0n
+        ? "Enter a valid limit price"
+      : insufficientBalance
+        ? `Not enough ${paySymbol}`
+      : needsSettlementApproval
+        ? `Approve ${paySymbol}`
+        : "Review limit order";
+  const actionDisabled = orderAction !== "idle" || (
+    mode === "Limit" &&
+    connected &&
+    onGiwa &&
+    (
+      orderConfig === null ||
+      !orderConfig.enabled ||
+      !hasAmount ||
+      !marketDataAvailable ||
+      limitAmountOut === 0n ||
+      insufficientBalance
+    )
+  );
   return (
     <>
       <div className="advanced-trade-shell">
@@ -435,16 +770,90 @@ export default function TradePage() {
                   </button>
                 ))}
               </div>
-              <button type="button" aria-label="Refresh orders">↻</button>
+              <button
+                type="button"
+                aria-label="Refresh orders"
+                onClick={() => void refreshOrders()}
+                disabled={ordersLoading || !connected}
+              >
+                {ordersLoading ? "…" : "↻"}
+              </button>
             </div>
             <div className="terminal-order-columns" aria-hidden="true">
               <span>Pair / type</span><span>Amount</span><span>Price</span><span>Status</span>
             </div>
-            <div className="terminal-orders-empty">
-              <span>⌁</span>
-              <strong>{orderTab === "Active" ? "No active orders" : "No order history"}</strong>
-              <p>{connected ? "Your orders will appear here." : "Connect your wallet to view your orders."}</p>
-            </div>
+            {orderError && <div className="terminal-order-error">{orderError}</div>}
+            {orders.length > 0 ? (
+              <div className="terminal-order-list">
+                {orders.map((order) => {
+                  const inputSymbol = symbolForOrderToken(order.tokenIn, TOKEN_LIST) ?? paySymbol;
+                  const outputSymbol = symbolForOrderToken(order.tokenOut, TOKEN_LIST) ?? receiveSymbol;
+                  const inputToken = TOKENS[inputSymbol];
+                  const listedPair = (Object.entries(pairs) as Array<
+                    [PairKey, (typeof pairs)[PairKey]]
+                  >).find(([, value]) => value.dataId === order.marketId)?.[0]
+                    ?? `${outputSymbol}/${inputSymbol}`;
+                  const listedQuote = listedPair.split("/")[1] ?? inputSymbol;
+                  const inputAmount = fromBaseUnits(
+                    BigInt(order.actualAmountIn ?? order.amountIn),
+                    inputToken.decimals,
+                    6,
+                  );
+                  const transactionHash = order.fillTxHash ?? order.executionTxHash;
+                  return (
+                    <div className="terminal-order-row" key={order.id}>
+                      <div>
+                        <span className={`terminal-order-side ${order.side}`}>
+                          {order.side === "buy" ? "Buy" : "Sell"}
+                        </span>
+                        <p>
+                          <strong>{listedPair}</strong>
+                          <small>{new Date(order.createdAt).toLocaleString()}</small>
+                        </p>
+                      </div>
+                      <span>{inputAmount} {inputSymbol}</span>
+                      <span>{formatPrice(Number(order.limitPrice))} {listedQuote}</span>
+                      <div className="terminal-order-status">
+                        <span className={`status-${order.status}`}>{order.status}</span>
+                        {orderTab === "Active" && (
+                          <button
+                            type="button"
+                            disabled={orderAction !== "idle" || order.status !== "open"}
+                            onClick={() => void cancelOrder(order)}
+                          >
+                            {order.status === "executing" ? "Executing" : "Cancel"}
+                          </button>
+                        )}
+                        {orderTab === "History" && transactionHash && (
+                          <a href={`${EXPLORER}/tx/${transactionHash}`} target="_blank" rel="noreferrer">
+                            ↗
+                          </a>
+                        )}
+                        {orderTab === "History" &&
+                          order.status === "cancelled" &&
+                          !order.cancelTxHash &&
+                          orderConfig?.settlementAddress && (
+                            <button
+                              type="button"
+                              disabled={orderAction !== "idle"}
+                              onClick={() => void cancelOrderOnchain(order)}
+                              title="Record cancellation onchain"
+                            >
+                              Secure
+                            </button>
+                          )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="terminal-orders-empty">
+                <span>⌁</span>
+                <strong>{orderTab === "Active" ? "No active orders" : "No order history"}</strong>
+                <p>{connected ? "Your orders will appear here." : "Connect your wallet to view your orders."}</p>
+              </div>
+            )}
           </Panel>
         </section>
 
@@ -469,7 +878,14 @@ export default function TradePage() {
           </div>
 
           <div className="terminal-order-field">
-            <div><span>You pay</span><small>Balance —</small></div>
+            <div>
+              <span>You pay</span>
+              <small>
+                Balance {connected
+                  ? fromBaseUnits(payBalance, payToken.decimals, 5)
+                  : "—"}
+              </small>
+            </div>
             <label>
               <input value={amount} inputMode="decimal" placeholder="0.00" aria-label="Order amount" onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} />
               <span><TokenIcon symbol={paySymbol} />{paySymbol}</span>
@@ -507,11 +923,12 @@ export default function TradePage() {
 
           <dl className="terminal-order-summary">
             <div><dt>Reference price</dt><dd>{currentPrice === null ? "—" : `1 ${pair.base} = ${formatPrice(currentPrice)} ${pair.quote}`}</dd></div>
-            <div><dt>Price impact</dt><dd>Calculated at execution</dd></div>
-            <div><dt>Network fee</dt><dd>Estimated in wallet</dd></div>
+            <div><dt>Execution condition</dt><dd>{mode === "Limit" ? `At ${limitPrice || "—"} ${pair.quote}` : "Best available route"}</dd></div>
+            <div><dt>Order fee cap</dt><dd>{mode === "Limit" ? "0.30%" : "Shown in Swap"}</dd></div>
           </dl>
 
-          <button className="app-primary-button terminal-order-action" type="button" disabled={connected && onGiwa && (!hasAmount || !marketDataAvailable)} onClick={handlePrimaryAction}>
+          {orderError && <div className="terminal-ticket-error">{orderError}</div>}
+          <button className="app-primary-button terminal-order-action" type="button" disabled={actionDisabled} onClick={handlePrimaryAction}>
             {actionLabel}
           </button>
         </Panel>
@@ -526,11 +943,22 @@ export default function TradePage() {
             <div className="terminal-review-pair"><TokenIcon symbol={pair.base} /><TokenIcon symbol={pair.quote} /><strong>{pairKey}</strong><span>{side}</span></div>
             <dl className="review-details">
               <div><dt>You pay</dt><dd>{amount} {paySymbol}</dd></div>
-              <div><dt>You receive</dt><dd>≈ {receiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} {receiveSymbol}</dd></div>
+              <div><dt>Minimum receive</dt><dd>≥ {receiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} {receiveSymbol}</dd></div>
               <div><dt>Execution</dt><dd>{mode === "Market" ? "Best available price" : `${formatPrice(executionPrice)} ${pair.quote}`}</dd></div>
               {mode === "Limit" && <div><dt>Expiry</dt><dd>{expiry}</dd></div>}
             </dl>
-            <button className="app-primary-button" type="button" onClick={submitOrder}>Confirm in wallet</button>
+            <button
+              className="app-primary-button"
+              type="button"
+              disabled={orderAction !== "idle"}
+              onClick={() => void submitLimitOrder()}
+            >
+              {orderAction === "signing"
+                ? "Confirm in wallet…"
+                : orderAction === "submitting"
+                  ? "Submitting…"
+                  : "Sign limit order"}
+            </button>
           </div>
         </div>
       )}

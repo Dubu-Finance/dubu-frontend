@@ -15,3 +15,4 @@
 /data/*.sqlite-shm
 /data/*.sqlite-wal
 /data/legacy-market-data-json/
+artifacts/

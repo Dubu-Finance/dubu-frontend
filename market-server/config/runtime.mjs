@@ -27,5 +27,20 @@ export function loadRuntimeConfig() {
     binanceRestUrl: process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision",
     binanceWebSocketUrl:
       process.env.BINANCE_WEBSOCKET_URL ?? "wss://data-stream.binance.vision/stream",
+    giwaRpcUrl: process.env.GIWA_RPC_URL ?? "https://sepolia-rpc.giwa.io",
+    aggregatorUrl:
+      process.env.DUBU_AGGREGATOR_URL ?? "https://dubu-aggregator.polyrose.workers.dev",
+    limitOrderSettlementAddress: process.env.LIMIT_ORDER_SETTLEMENT_ADDRESS ?? "",
+    limitOrderExecutorPrivateKey: process.env.LIMIT_ORDER_EXECUTOR_PRIVATE_KEY ?? "",
+    limitOrderPollMs: Math.max(1_000, readNumber(process.env.LIMIT_ORDER_POLL_MS, 3_000)),
+    limitOrderBatchSize: Math.max(1, readNumber(process.env.LIMIT_ORDER_BATCH_SIZE, 20)),
+    limitOrderAllowRfq: readBoolean(process.env.LIMIT_ORDER_ALLOW_RFQ, false),
+    limitOrderConfirmations: Math.max(
+      1,
+      readNumber(process.env.LIMIT_ORDER_CONFIRMATIONS, 1),
+    ),
+    limitOrderStartBlock: process.env.LIMIT_ORDER_START_BLOCK
+      ? Math.max(0, readNumber(process.env.LIMIT_ORDER_START_BLOCK, 0))
+      : null,
   };
 }
