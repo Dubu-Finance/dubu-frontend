@@ -42,6 +42,7 @@ type AppWalletContextValue = {
 };
 
 const GIWA_CHAIN_ID = "0x164ce";
+const WALLET_CONNECTION_KEY = "dubu-wallet-connection";
 const GIWA_CHAIN = {
   chainId: GIWA_CHAIN_ID,
   chainName: "GIWA Sepolia",
@@ -103,9 +104,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const provider = window.ethereum;
     if (!provider) return;
 
-    void provider.request({ method: "eth_chainId" })
-      .then((value) => setChainId(String(value).toLowerCase()))
-      .catch(() => setChainId(""));
+    let active = true;
+
+    async function restoreWallet() {
+      const activeChain = await provider?.request({ method: "eth_chainId" })
+        .catch(() => "");
+      if (!active) return;
+      setChainId(String(activeChain ?? "").toLowerCase());
+
+      if (window.localStorage.getItem(WALLET_CONNECTION_KEY) === "disconnected") return;
+      const result = await provider?.request({ method: "eth_accounts" })
+        .catch(() => []);
+      const account = Array.isArray(result) ? String(result[0] ?? "") : "";
+      if (!active || !account) return;
+
+      window.localStorage.setItem(WALLET_CONNECTION_KEY, "connected");
+      setAddress(account);
+      void readBalance(account, provider);
+    }
+
+    void restoreWallet();
 
     const handleAccountsChanged = (...args: unknown[]) => {
       const accounts = args[0] as string[] | undefined;
@@ -114,22 +132,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setEthBalance(null);
         return;
       }
+      if (window.localStorage.getItem(WALLET_CONNECTION_KEY) === "disconnected") return;
+      window.localStorage.setItem(WALLET_CONNECTION_KEY, "connected");
       setAddress(accounts[0]);
       void readBalance(accounts[0], provider);
     };
 
     const handleChainChanged = (...args: unknown[]) => {
       setChainId(String(args[0] ?? "").toLowerCase());
-      if (address) void readBalance(address, provider);
+      if (window.localStorage.getItem(WALLET_CONNECTION_KEY) === "disconnected") return;
+      void provider.request({ method: "eth_accounts" })
+        .then((result) => {
+          const account = Array.isArray(result) ? String(result[0] ?? "") : "";
+          if (!account) return;
+          setAddress(account);
+          void readBalance(account, provider);
+        })
+        .catch(() => undefined);
     };
 
     provider.on?.("accountsChanged", handleAccountsChanged);
     provider.on?.("chainChanged", handleChainChanged);
     return () => {
+      active = false;
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
       provider.removeListener?.("chainChanged", handleChainChanged);
     };
-  }, [address]);
+  }, []);
 
   function setTheme(nextTheme: Theme) {
     setThemeState(nextTheme);
@@ -164,6 +193,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const result = await provider.request({ method: "eth_requestAccounts" });
       const account = Array.isArray(result) ? String(result[0] ?? "") : "";
       if (!account) throw new Error("No account returned");
+      window.localStorage.setItem(WALLET_CONNECTION_KEY, "connected");
       setAddress(account);
       const activeChain = await provider.request({ method: "eth_chainId" });
       setChainId(String(activeChain).toLowerCase());
@@ -219,6 +249,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   function disconnect() {
+    window.localStorage.setItem(WALLET_CONNECTION_KEY, "disconnected");
     setAddress("");
     setEthBalance(null);
     setWalletMenuOpen(false);

@@ -1325,7 +1325,11 @@ export default function TradePage() {
         >
           <div className="limit-fill-icon" aria-hidden="true">
             <i />
-            <span>✓</span>
+            <span>
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6.5 12.4 10.2 16l7.5-8" />
+              </svg>
+            </span>
           </div>
           <div className="limit-fill-content">
             <span className="limit-fill-eyebrow">Limit order filled</span>
