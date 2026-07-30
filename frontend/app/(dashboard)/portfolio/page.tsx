@@ -100,7 +100,7 @@ export default function PortfolioPage() {
             visibleAddress as `0x${string}`,
           );
           const balance = fromBaseUnits(rawBalance, token.decimals, 8);
-          const amount = Number(balance);
+          const amount = Number(balance.replace(/,/g, ""));
 
           if (token.symbol === "mUSDC") {
             return {
