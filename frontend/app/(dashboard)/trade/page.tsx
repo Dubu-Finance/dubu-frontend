@@ -7,6 +7,7 @@ import {
   TokenIcon,
   useAppWallet,
 } from "@/app/components/AppShell";
+import { TransactionStatusModal } from "@/app/components/TransactionStatusModal";
 import {
   EXPLORER,
   MAX_APPROVAL,
@@ -16,9 +17,12 @@ import {
   balanceOf,
   encodeApprove,
   fromBaseUnits,
+  hasMarket,
+  isMarketConfigured,
   toBaseUnits,
   type TokenSymbol,
 } from "@/app/lib/dubu";
+import { useSwapExecution } from "@/app/lib/swap-execution";
 import {
   fetchMarketSnapshot,
   subscribeToMarket,
@@ -441,14 +445,23 @@ export default function TradePage() {
   const payToken = TOKENS[paySymbol];
   const receiveToken = TOKENS[receiveSymbol];
   const amountIn = toBaseUnits(amount, payToken.decimals);
+  const clearAmount = useCallback(() => setAmount(""), []);
+  const marketSwap = useSwapExecution({
+    fromSymbol: paySymbol,
+    toSymbol: receiveSymbol,
+    amount,
+    connected,
+    address,
+    enabled: mode === "Market",
+    onSubmitted: clearAmount,
+  });
+  // The market swap is gated on the aggregator's markets rather than on `marketDataAvailable`:
+  // the equity pairs carry `dataId: null` and so have no chart feed, but they quote and fill.
+  const marketQuotable = hasMarket(paySymbol, receiveSymbol)
+    && isMarketConfigured(paySymbol, receiveSymbol);
   const executionPrice = mode === "Limit"
     ? Number.parseFloat(limitPrice) || currentPrice || 0
     : currentPrice || 0;
-  const estimatedMarketReceive = hasAmount && executionPrice > 0
-    ? side === "Buy"
-      ? numericAmount / executionPrice
-      : numericAmount * executionPrice
-    : 0;
   const limitAmountOut = calculateLimitOutput({
     side,
     amountIn,
@@ -456,9 +469,17 @@ export default function TradePage() {
     outputDecimals: receiveToken.decimals,
     limitPrice,
   });
-  const receiveAmount = mode === "Limit"
-    ? Number(fromBaseUnits(limitAmountOut, receiveToken.decimals, 8).replace(/,/g, ""))
-    : estimatedMarketReceive;
+  const limitReceiveAmount = Number(
+    fromBaseUnits(limitAmountOut, receiveToken.decimals, 8).replace(/,/g, ""),
+  );
+  // Market mode shows what the aggregator will actually pay out, not a price-times-amount guess.
+  const receiveDisplay = mode === "Limit"
+    ? hasAmount
+      ? limitReceiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })
+      : "0.00"
+    : marketSwap.quote
+      ? fromBaseUnits(BigInt(marketSwap.quote.amountOut), receiveToken.decimals, 6)
+      : "0.00";
   const insufficientBalance = connected && amountIn > payBalance;
   const needsSettlementApproval = mode === "Limit"
     && amountIn > 0n
@@ -958,12 +979,15 @@ export default function TradePage() {
       return;
     }
     if (mode === "Market") {
-      const query = new URLSearchParams({
-        from: paySymbol,
-        to: receiveSymbol,
-        amount,
-      });
-      window.location.assign(`/swap?${query}`);
+      if (!marketQuotable || !hasAmount || insufficientBalance) return;
+      if (marketSwap.stage !== "idle" || !marketSwap.quote) return;
+      if (marketSwap.needsApproval) {
+        void marketSwap.onApprove();
+        return;
+      }
+      // The ticket reads its own balance, so it has to be re-read once the swap has settled --
+      // the hook only refreshes the figures it owns.
+      void marketSwap.onSwap().then(() => refreshTradingAccount());
       return;
     }
     if (!hasAmount || !marketDataAvailable) return;
@@ -975,12 +999,27 @@ export default function TradePage() {
     setReviewOpen(true);
   }
 
+  const marketActionLabel = !marketQuotable
+    ? "Market setup pending"
+    : !hasAmount
+      ? "Enter an amount"
+    : insufficientBalance
+      ? `Not enough ${paySymbol}`
+    : marketSwap.stage === "quoting"
+      ? "Finding best route…"
+    : !marketSwap.quote
+      ? marketSwap.quoteError ? "No route" : "Enter an amount"
+    : marketSwap.needsApproval
+      ? marketSwap.stage === "approving" ? "Approving…" : `Approve ${paySymbol}`
+    : marketSwap.stage === "swapping"
+      ? "Confirm in wallet…"
+      : "Swap";
   const actionLabel = !connected
     ? "Connect wallet"
     : !onGiwa
       ? "Switch network"
       : mode === "Market"
-        ? "Open market swap"
+        ? marketActionLabel
       : orderConfig === null
         ? "Loading limit orders"
       : !orderConfig.enabled
@@ -1005,17 +1044,24 @@ export default function TradePage() {
         ? `Approve ${paySymbol}`
         : "Review limit order";
   const actionDisabled = orderAction !== "idle" || (
-    mode === "Limit" &&
     connected &&
     onGiwa &&
-    (
-      orderConfig === null ||
-      !orderConfig.enabled ||
-      !hasAmount ||
-      !marketDataAvailable ||
-      limitAmountOut === 0n ||
-      insufficientBalance
-    )
+    (mode === "Limit"
+      ? (
+        orderConfig === null ||
+        !orderConfig.enabled ||
+        !hasAmount ||
+        !marketDataAvailable ||
+        limitAmountOut === 0n ||
+        insufficientBalance
+      )
+      : (
+        !marketQuotable ||
+        !hasAmount ||
+        insufficientBalance ||
+        marketSwap.stage !== "idle" ||
+        !marketSwap.quote
+      ))
   );
   return (
     <>
@@ -1314,9 +1360,12 @@ export default function TradePage() {
           <div className="terminal-ticket-divider"><span>↓</span></div>
 
           <div className="terminal-order-field receive">
-            <div><span>You receive</span><small>Estimated</small></div>
+            <div>
+              <span>You receive</span>
+              <small>{mode === "Market" && marketSwap.quote ? "Live quote" : "Estimated"}</small>
+            </div>
             <label>
-              <strong>{hasAmount ? receiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 }) : "0.00"}</strong>
+              <strong>{receiveDisplay}</strong>
               <span><TokenIcon symbol={receiveSymbol} />{receiveSymbol}</span>
             </label>
             <small>Before wallet confirmation</small>
@@ -1338,7 +1387,16 @@ export default function TradePage() {
           <dl className="terminal-order-summary">
             <div><dt>Reference price</dt><dd>{currentPrice === null ? "—" : `1 ${pair.base} = ${formatPrice(currentPrice)} ${pair.quote}`}</dd></div>
             <div><dt>Execution condition</dt><dd>{mode === "Limit" ? `At ${limitPrice || "—"} ${pair.quote}` : "Best available route"}</dd></div>
-            <div><dt>Order fee cap</dt><dd>{mode === "Limit" ? "0.30%" : "Shown in Swap"}</dd></div>
+            <div>
+              <dt>{mode === "Limit" ? "Order fee cap" : "Minimum receive"}</dt>
+              <dd>
+                {mode === "Limit"
+                  ? "0.30%"
+                  : marketSwap.quote
+                    ? `${fromBaseUnits(BigInt(marketSwap.quote.minAmountOut), receiveToken.decimals, 6)} ${receiveSymbol}`
+                    : "—"}
+              </dd>
+            </div>
           </dl>
 
           {orderError?.context === "ticket" && !reviewOpen && (
@@ -1346,6 +1404,11 @@ export default function TradePage() {
               error={orderError}
               onDismiss={() => setOrderError(null)}
             />
+          )}
+          {mode === "Market" && (marketSwap.error ?? marketSwap.quoteError) && (
+            <div className="terminal-ticket-error">
+              {marketSwap.error ?? marketSwap.quoteError}
+            </div>
           )}
           <button className="app-primary-button terminal-order-action" type="button" disabled={actionDisabled} onClick={handlePrimaryAction}>
             {actionLabel}
@@ -1362,7 +1425,7 @@ export default function TradePage() {
             <div className="terminal-review-pair"><TokenIcon symbol={pair.base} /><TokenIcon symbol={pair.quote} /><strong>{pairKey}</strong><span>{side}</span></div>
             <dl className="review-details">
               <div><dt>You pay</dt><dd>{amount} {paySymbol}</dd></div>
-              <div><dt>Minimum receive</dt><dd>≥ {receiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} {receiveSymbol}</dd></div>
+              <div><dt>Minimum receive</dt><dd>≥ {limitReceiveAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} {receiveSymbol}</dd></div>
               <div><dt>Execution</dt><dd>{mode === "Market" ? "Best available price" : `${formatPrice(executionPrice)} ${pair.quote}`}</dd></div>
               {mode === "Limit" && <div><dt>Expiry</dt><dd>{expiry}</dd></div>}
             </dl>
@@ -1452,6 +1515,15 @@ export default function TradePage() {
           </button>
         </aside>
       )}
+
+      {marketSwap.transaction && (
+        <TransactionStatusModal
+          transaction={marketSwap.transaction}
+          onClose={() => marketSwap.setTransaction(null)}
+          backLabel="Back to trade"
+        />
+      )}
+
       {toast && <Toast>{toast}</Toast>}
     </>
   );
