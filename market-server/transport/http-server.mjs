@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { MARKET_BY_ID, SUPPORTED_INTERVALS } from "../config/markets.mjs";
+import { resolveCorsOrigin } from "./origin.mjs";
 
 function sendJson(response, status, payload, origin) {
   response.writeHead(status, {
@@ -9,12 +10,6 @@ function sendJson(response, status, payload, origin) {
     Vary: "Origin",
   });
   response.end(JSON.stringify(payload));
-}
-
-function resolveCorsOrigin(request, allowedOrigins) {
-  const origin = request.headers.origin;
-  if (!origin) return allowedOrigins[0] ?? "*";
-  return allowedOrigins.includes(origin) ? origin : allowedOrigins[0] ?? "null";
 }
 
 async function readJsonBody(request, maxBytes = 64 * 1024) {

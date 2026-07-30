@@ -6306,6 +6306,61 @@
   border-radius: 10px;
 }
 
+.terminal-ticket-error.modal-error {
+  margin: 14px 0 0;
+}
+
+.terminal-signing-status {
+  margin-top: 14px;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--app-line);
+  border-radius: 13px;
+  background: var(--app-soft);
+}
+
+.terminal-signing-status > span {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(190, 128, 61, 0.28);
+  border-top-color: #c17b38;
+  border-radius: 50%;
+  animation: terminal-signing-spin 900ms linear infinite;
+}
+
+.terminal-signing-status.success > span {
+  border: 0;
+  color: #167753;
+  background: rgba(37, 166, 114, 0.12);
+  animation: none;
+}
+
+.terminal-signing-status strong,
+.terminal-signing-status p {
+  display: block;
+}
+
+.terminal-signing-status strong {
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.terminal-signing-status p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@keyframes terminal-signing-spin {
+  to { transform: rotate(360deg); }
+}
+
 .terminal-order-ticket {
   position: sticky;
   top: 85px;

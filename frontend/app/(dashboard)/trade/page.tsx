@@ -138,6 +138,21 @@ function shortHash(value: string) {
   return `${value.slice(0, 7)}…${value.slice(-5)}`;
 }
 
+function orderActionError(error: unknown, fallback: string) {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = Number((error as { code?: unknown }).code);
+    if (code === 4001) return "The wallet request was cancelled.";
+    if (code === -32002) {
+      return "A wallet request is already open. Open your wallet extension to continue.";
+    }
+  }
+  if (typeof error === "object" && error && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
+  return fallback;
+}
+
 export default function TradePage() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
   const [pairKey, setPairKey] = useState<PairKey>("mWETH/mUSDC");
@@ -463,21 +478,38 @@ export default function TradePage() {
 
   async function submitLimitOrder() {
     const provider = ethereumProvider();
-    if (
-      !provider ||
-      !address ||
-      !pair.dataId ||
-      !payToken.address ||
-      !receiveToken.address ||
-      !orderConfig?.enabled ||
-      !orderConfig.settlementAddress ||
-      amountIn === 0n ||
-      limitAmountOut === 0n
-    ) return;
+    if (!provider) {
+      setOrderError("No browser wallet was detected.");
+      return;
+    }
+    if (!address) {
+      setOrderError("Reconnect your wallet before signing this order.");
+      return;
+    }
+    if (!onGiwa) {
+      setOrderError("Switch your wallet to the trading network before signing.");
+      return;
+    }
+    if (!pair.dataId || !payToken.address || !receiveToken.address) {
+      setOrderError("This market is not ready for limit orders.");
+      return;
+    }
+    if (!orderConfig?.enabled || !orderConfig.settlementAddress) {
+      setOrderError("Limit-order settlement is temporarily unavailable.");
+      return;
+    }
+    if (amountIn === 0n || limitAmountOut === 0n) {
+      setOrderError("Enter a valid amount and limit price.");
+      return;
+    }
 
     setOrderAction("signing");
     setOrderError("");
     try {
+      const accounts = await provider.request({ method: "eth_accounts" }) as string[];
+      if (!accounts.some((account) => account.toLowerCase() === address.toLowerCase())) {
+        throw new Error("The connected wallet account changed. Reconnect and try again.");
+      }
       const now = Math.floor(Date.now() / 1_000);
       const order: LimitOrderMessage = {
         maker: address as `0x${string}`,
@@ -506,11 +538,15 @@ export default function TradePage() {
       });
       setReviewOpen(false);
       setAmount("");
+      setOrderTab("Active");
+      setOrders((current) => [
+        created,
+        ...current.filter((order) => order.orderHash !== created.orderHash),
+      ]);
       setToast(`Limit order ${shortHash(created.orderHash)} is active.`);
       window.setTimeout(() => setToast(""), 3_200);
-      await refreshOrders();
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Limit order was not created.");
+      setOrderError(orderActionError(error, "Limit order was not created."));
     } finally {
       setOrderAction("idle");
     }
@@ -947,6 +983,25 @@ export default function TradePage() {
               <div><dt>Execution</dt><dd>{mode === "Market" ? "Best available price" : `${formatPrice(executionPrice)} ${pair.quote}`}</dd></div>
               {mode === "Limit" && <div><dt>Expiry</dt><dd>{expiry}</dd></div>}
             </dl>
+            {orderAction === "signing" && (
+              <div className="terminal-signing-status" role="status">
+                <span />
+                <div>
+                  <strong>Waiting for your signature</strong>
+                  <p>Open your wallet extension and approve the typed-data request.</p>
+                </div>
+              </div>
+            )}
+            {orderAction === "submitting" && (
+              <div className="terminal-signing-status success" role="status">
+                <span>✓</span>
+                <div>
+                  <strong>Signature approved</strong>
+                  <p>Saving your order and starting price monitoring.</p>
+                </div>
+              </div>
+            )}
+            {orderError && <div className="terminal-ticket-error modal-error">{orderError}</div>}
             <button
               className="app-primary-button"
               type="button"
@@ -954,9 +1009,9 @@ export default function TradePage() {
               onClick={() => void submitLimitOrder()}
             >
               {orderAction === "signing"
-                ? "Confirm in wallet…"
+                ? "Waiting for wallet…"
                 : orderAction === "submitting"
-                  ? "Submitting…"
+                  ? "Saving order…"
                   : "Sign limit order"}
             </button>
           </div>

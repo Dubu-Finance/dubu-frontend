@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { isAllowedOrigin } from "./origin.mjs";
 
 export class WebSocketHub {
   constructor({ allowedOrigins = [] } = {}) {
@@ -18,7 +19,7 @@ export class WebSocketHub {
       const marketId = url.searchParams.get("marketId");
       const wallet = url.searchParams.get("wallet")?.toLowerCase();
       const origin = request.headers.origin;
-      const originAllowed = !origin || this.allowedOrigins.includes(origin);
+      const originAllowed = isAllowedOrigin(origin, this.allowedOrigins);
       if (!originAllowed) {
         socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
