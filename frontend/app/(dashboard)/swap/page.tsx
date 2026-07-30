@@ -7,6 +7,7 @@ import {
   CONTRACTS,
   EXPLORER,
   TOKENS,
+  MAX_APPROVAL,
   TOKEN_LIST,
   allowance,
   balanceOf,
@@ -329,7 +330,10 @@ function SwapPageContent() {
     try {
       const hash = await send({
         to: quote.approve.token,
-        data: encodeApprove(quote.approve.spender, amountIn),
+        // Unlimited, not `amountIn`. An exact approval is consumed by the swap it was granted for,
+        // so the next swap needs another one -- which is why this asked for two confirmations on
+        // every single trade.
+        data: encodeApprove(quote.approve.spender, MAX_APPROVAL),
       });
       setTransaction((current) => current ? { ...current, state: "pending", hash } : current);
       const receipt = await waitForReceipt(hash);
@@ -345,7 +349,9 @@ function SwapPageContent() {
         } : current);
         return;
       }
-      setApproved((current) => current >= amountIn ? current : amountIn);
+      // What was actually granted, so `needsApproval` stays false for the rest of the session
+      // rather than only for trades no larger than this one.
+      setApproved((current) => current >= MAX_APPROVAL ? current : MAX_APPROVAL);
       setTransaction((current) => current ? { ...current, state: "success" } : current);
       await refreshAccount(amountIn);
     } catch (e) {

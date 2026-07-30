@@ -315,6 +315,21 @@ export function encodeApprove(spender: `0x${string}`, amount: bigint): `0x${stri
 }
 
 /**
+ * `2^256 - 1`, the approval amount that does not need renewing.
+ *
+ * Approving the exact `amountIn` means the swap consumes the whole allowance and the *next* swap
+ * needs another approval — two wallet confirmations for every trade, forever. That is what this
+ * replaces.
+ *
+ * The trade-off is a standing unlimited allowance to the Router, which is what every major DEX
+ * does and is not free: it is only as safe as the Router contract. The stronger version is
+ * Permit2, which the Router already has an entry point for (`swapExactInWithPermit2`) and which is
+ * already deployed on this chain — but the aggregator builds `swapExactIn` calldata and has no
+ * Permit2 path, so that route needs work on both sides. This is the cheap 95% of the win.
+ */
+export const MAX_APPROVAL = (1n << 256n) - 1n;
+
+/**
  * Live pool state, for the panel that shows why a quote is what it is.
  *
  * `effectiveCapacity` rather than the raw one: it is what the pool will actually fill, after the
