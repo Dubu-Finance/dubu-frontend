@@ -7,6 +7,7 @@ import {
   TokenIcon,
   useAppWallet,
 } from "@/app/components/AppShell";
+import { TokenPicker } from "@/app/components/TokenPicker";
 import { TransactionStatusModal } from "@/app/components/TransactionStatusModal";
 import {
   EXPLORER,
@@ -96,6 +97,13 @@ const pairs: Record<PairKey, {
 };
 
 const pairKeys = Object.keys(pairs) as PairKey[];
+
+// Every market here is quoted in mUSDC, so the picker lists base assets and the pair follows from
+// the one that is chosen.
+const tradeTokens = pairKeys.map((key) => TOKENS[pairs[key].base]);
+const pairForBase: Partial<Record<TokenSymbol, PairKey>> = Object.fromEntries(
+  pairKeys.map((key) => [pairs[key].base, key]),
+);
 
 function formatPrice(value: number) {
   return value.toLocaleString("en-US", {
@@ -1137,24 +1145,17 @@ export default function TradePage() {
                   <b>⌄</b>
                 </button>
                 {pairMenuOpen && (
-                  <div className="terminal-pair-menu" role="listbox" aria-label="Select market">
-                    {pairKeys.map((key) => {
-                      const option = pairs[key];
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          role="option"
-                          aria-selected={key === pairKey}
-                          onClick={() => selectPair(key)}
-                        >
-                          <span className="terminal-pair-icons"><TokenIcon symbol={option.base} /><TokenIcon symbol={option.quote} /></span>
-                          <span><strong>{key}</strong><small>{option.dataId ? "Live market data" : "Data pending"}</small></span>
-                          {key === pairKey && <b>✓</b>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <TokenPicker
+                    tokens={tradeTokens}
+                    selected={pair.base}
+                    balances={marketSwap.balances}
+                    connected={connected}
+                    label="Select market"
+                    onSelect={(symbol) => {
+                      const next = pairForBase[symbol];
+                      if (next) selectPair(next);
+                    }}
+                  />
                 )}
               </div>
               <div className={`terminal-price ${priceFlash.direction ? `price-${priceFlash.direction}` : ""}`}>

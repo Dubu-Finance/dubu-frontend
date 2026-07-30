@@ -5844,65 +5844,12 @@
   flex: 0 0 auto;
 }
 
-.terminal-pair-menu {
-  position: absolute;
+/* The market picker is the shared token dropdown, but it has to clear the chart's price layer.
+   The width is clamped here rather than in the mobile query because this selector outranks it. */
+.terminal-pair-picker .dubu-token-dropdown {
   top: calc(100% + 14px);
-  left: 0;
   z-index: 55;
-  width: 310px;
-  max-height: 390px;
-  padding: 8px;
-  overflow-y: auto;
-  border: 1px solid var(--app-line);
-  border-radius: 15px;
-  background: var(--app-surface-solid);
-  box-shadow: 0 22px 60px rgba(48, 33, 19, 0.2);
-}
-
-.terminal-pair-menu > button {
-  width: 100%;
-  min-height: 58px;
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  border-radius: 10px;
-  color: var(--app-text);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-
-.terminal-pair-menu > button:hover,
-.terminal-pair-menu > button[aria-selected="true"] {
-  background: var(--app-soft);
-}
-
-.terminal-pair-menu > button > span:nth-child(2) {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 3px;
-}
-
-.terminal-pair-menu > button strong {
-  font-size: 13px;
-}
-
-.terminal-pair-menu > button small,
-.terminal-pair-menu > button > b {
-  color: var(--app-muted);
-  font-size: 10px;
-}
-
-.terminal-pair-menu .terminal-pair-icons {
-  width: 42px;
-}
-
-.terminal-pair-menu .terminal-pair-icons .token-icon {
-  width: 27px;
-  height: 27px;
+  width: min(310px, calc(100vw - 58px));
 }
 
 .terminal-pair-icons {

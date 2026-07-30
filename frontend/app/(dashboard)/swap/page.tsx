@@ -3,15 +3,19 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Panel, TokenIcon, useAppWallet } from "@/app/components/AppShell";
+import { TokenPicker } from "@/app/components/TokenPicker";
 import { TransactionStatusModal } from "@/app/components/TransactionStatusModal";
 import {
   TOKENS,
   TOKEN_LIST,
+  counterpartFor,
   fromBaseUnits,
   hasMarket,
   type TokenSymbol,
 } from "@/app/lib/dubu";
 import { useSwapExecution } from "@/app/lib/swap-execution";
+
+const swapTokens = TOKEN_LIST.filter((token) => token.symbol !== "mSPCX");
 
 function SwapPageContent() {
   const { connected, address, onGiwa, openWallet, switchToGiwa } = useAppWallet();
@@ -93,55 +97,35 @@ function SwapPageContent() {
     clearQuote();
   };
 
-  const tokenDropdown = (side: "from" | "to") => {
-    if (pickerSide !== side) return null;
+  // Picking a token always works. Markets are a star around mUSDC, so most picks have no market
+  // against whatever is on the other side; rather than grey out seven of eight rows and ask the
+  // user to reason about that graph, the other side moves to a token the pick does trade with.
+  const selectToken = (side: "from" | "to", symbol: TokenSymbol) => {
     const other = side === "from" ? toToken : fromToken;
-
-    return (
-      <div className="dubu-token-dropdown" role="listbox" aria-label={`Select ${side} token`}>
-        <div className="dubu-token-dropdown-head">
-          <strong>Select token</strong>
-          <span>Available assets</span>
-        </div>
-        {TOKEN_LIST.filter((token) => token.symbol !== "mSPCX").map((token) => {
-          const unavailable = token.symbol !== other && !hasMarket(token.symbol, other);
-          const selected = token.symbol === (side === "from" ? fromToken : toToken);
-          return (
-            <button
-              key={token.symbol}
-              type="button"
-              role="option"
-              aria-selected={selected}
-              disabled={token.symbol === other || unavailable}
-              onClick={() => {
-                if (side === "from") setFromToken(token.symbol);
-                else setToToken(token.symbol);
-                setPickerSide(null);
-                clearQuote();
-              }}
-            >
-              <TokenIcon symbol={token.symbol} />
-              <span className="dubu-token-copy">
-                <strong>{token.symbol}</strong>
-                <small>{token.name}</small>
-              </span>
-              <b>
-                {unavailable
-                  ? "No market"
-                  : !token.address
-                    ? "Placeholder"
-                  : connected
-                    ? fromBaseUnits(balances[token.symbol] ?? 0n, token.decimals, 4)
-                    : selected
-                      ? "Selected"
-                      : ""}
-              </b>
-            </button>
-          );
-        })}
-      </div>
-    );
+    const nextOther = counterpartFor(symbol, other) ?? other;
+    if (side === "from") {
+      setFromToken(symbol);
+      setToToken(nextOther);
+    } else {
+      setToToken(symbol);
+      setFromToken(nextOther);
+    }
+    setPickerSide(null);
+    clearQuote();
   };
+
+  const tokenDropdown = (side: "from" | "to") =>
+    pickerSide === side ? (
+      <TokenPicker
+        tokens={swapTokens}
+        selected={side === "from" ? fromToken : toToken}
+        otherSide={side === "from" ? toToken : fromToken}
+        balances={balances}
+        connected={connected}
+        label={`Select ${side} token`}
+        onSelect={(symbol) => selectToken(side, symbol)}
+      />
+    ) : null;
 
   // --- derived ----------------------------------------------------------------------------
   const outAmount = quote ? fromBaseUnits(BigInt(quote.amountOut), outInfo.decimals) : "";

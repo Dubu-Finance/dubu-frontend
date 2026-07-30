@@ -164,6 +164,24 @@ export function hasMarket(a: TokenSymbol, b: TokenSymbol): boolean {
   );
 }
 
+/**
+ * The token to hold on the other side of a pair once `symbol` has been picked.
+ *
+ * Every market here is `<base>/mUSDC`, so most picks force the other side to mUSDC — but the answer
+ * is read out of `MARKETS` rather than hardcoded, so it survives the day this stops being a star.
+ * `preferred` is returned untouched when it already trades against the pick, which is what keeps an
+ * existing selection from being moved for no reason. `null` means the token has no market at all.
+ */
+export function counterpartFor(
+  symbol: TokenSymbol,
+  preferred?: TokenSymbol,
+): TokenSymbol | null {
+  if (preferred && preferred !== symbol && hasMarket(symbol, preferred)) return preferred;
+  const market = MARKETS.find(({ base, quote }) => base === symbol || quote === symbol);
+  if (!market) return null;
+  return market.base === symbol ? market.quote : market.base;
+}
+
 export function isMarketConfigured(a: TokenSymbol, b: TokenSymbol): boolean {
   const market = MARKETS.find(
     ({ base, quote }) => (base === a && quote === b) || (base === b && quote === a),
