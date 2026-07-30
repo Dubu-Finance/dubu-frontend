@@ -9,6 +9,7 @@ import {
 
 const SETTLEMENT_ABI = [
   "function fillOrder((address maker,address receiver,address tokenIn,address tokenOut,uint256 amountIn,uint256 minAmountOut,uint64 validAfter,uint64 expiry,uint256 nonce,uint256 salt,uint16 maxFeeBps) order,bytes signature,bytes routerCalldata) returns (uint256 netAmountOut)",
+  "function feeBps() view returns (uint16)",
   "event OrderFilled(bytes32 indexed orderHash,address indexed maker,address indexed receiver,address tokenIn,address tokenOut,uint256 amountIn,uint256 grossAmountOut,uint256 netAmountOut,uint256 protocolFee,address executor)",
   "event OrderCancelled(bytes32 indexed orderHash,address indexed maker)",
 ];
@@ -96,9 +97,13 @@ export class OrderExecutionService {
     }
 
     let quote;
+    let protocolFeeBps;
     let submittedHash = null;
     try {
-      quote = await this.fetchExecutableQuote(order);
+      [quote, protocolFeeBps] = await Promise.all([
+        this.fetchExecutableQuote(order),
+        this.contract.feeBps(),
+      ]);
     } catch (error) {
       await this.repository.releaseOrder(order, {
         delayMs: 5_000,
@@ -117,9 +122,19 @@ export class OrderExecutionService {
       return;
     }
 
+    if (protocolFeeBps > BigInt(order.maxFeeBps)) {
+      await this.repository.releaseOrder(order, {
+        delayMs: 30_000,
+        error: "The current protocol fee exceeds the order's signed maximum.",
+        quotedAmountOut: quote.amountOut,
+        venues,
+      });
+      return;
+    }
+
     const grossAmountOut = BigInt(quote.amountOut);
-    const worstFee = (grossAmountOut * BigInt(order.maxFeeBps)) / 10_000n;
-    if (grossAmountOut - worstFee < BigInt(order.minAmountOut)) {
+    const protocolFee = (grossAmountOut * protocolFeeBps) / 10_000n;
+    if (grossAmountOut - protocolFee < BigInt(order.minAmountOut)) {
       await this.repository.releaseOrder(order, {
         delayMs: 2_500,
         quotedAmountOut: quote.amountOut,

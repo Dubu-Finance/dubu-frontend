@@ -190,23 +190,10 @@ export class OrderRepository {
       const result = await client.query(
         `WITH candidates AS (
          SELECT id
-           FROM limit_orders AS candidate_order
-           JOIN LATERAL (
-             SELECT close
-             FROM candles
-             WHERE market_id = candidate_order.market_id
-               AND interval = '5m'
-             ORDER BY open_time DESC
-             LIMIT 1
-           ) AS latest_price ON TRUE
+           FROM limit_orders
            WHERE status = 'open'
              AND expires_at > NOW()
              AND next_attempt_at <= NOW()
-             AND (
-               (candidate_order.side = 'buy' AND latest_price.close <= candidate_order.limit_price)
-               OR
-               (candidate_order.side = 'sell' AND latest_price.close >= candidate_order.limit_price)
-             )
            ORDER BY next_attempt_at ASC, created_at ASC
            LIMIT $1
            FOR UPDATE SKIP LOCKED
