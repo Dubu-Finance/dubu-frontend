@@ -58,6 +58,14 @@ export function useDocsLang() {
     if (isLang(stored) && stored !== "en") setLangState(stored);
   }, []);
 
+  // The root element is rendered by a server layout that cannot know the reader's choice, so it
+  // always says English. Left alone, a screen reader pronounces the whole Korean page with an
+  // English voice. The per-section lang attributes are what mark the English islands inside
+  // Korean prose; this is the document-level statement they sit inside.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
 
