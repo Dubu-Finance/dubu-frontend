@@ -23,7 +23,7 @@ import {
   quoteResponse,
   wordLayout,
 } from "./docs-data";
-import { type Lang, LangProvider, LangToggle, Section, UI, navLabel, useDocsLang } from "./docs-i18n";
+import { UI } from "./docs-lang";
 import "./docs.css";
 
 const docGroups = [
@@ -77,38 +77,14 @@ const toc = [
 ] as const;
 
 export default function DocsPage() {
-  const { lang, setLang } = useDocsLang();
-
-  // The provider is above the page rather than inside it so that Section and CodeBlock can read
-  // the language without it being drilled through fifteen call sites.
-  return (
-    <LangProvider lang={lang}>
-      <DocsPageBody lang={lang} setLang={setLang} />
-    </LangProvider>
-  );
-}
-
-function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => void }) {
   const [isDark, setIsDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [docsMenuOpen, setDocsMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeId, setActiveId] = useState("overview");
   const sidebarRef = useRef<HTMLElement>(null);
-  const t = UI[lang];
+  const t = UI;
 
-  // Korean runs shorter than English, so a mid-page toggle would drop the reader somewhere else
-  // entirely. The sidebar already tracks the section they are reading; put them back on it.
-  // .docs-section carries scroll-margin-top, so this clears the sticky header for free.
-  const changeLang = (next: Lang) => {
-    const anchor = activeId;
-    const scrolled = window.scrollY > 8;
-    setLang(next);
-    if (!scrolled) return;
-    requestAnimationFrame(() => {
-      document.getElementById(anchor)?.scrollIntoView({ block: "start" });
-    });
-  };
 
   useEffect(() => {
     if (docsMenuOpen) sidebarRef.current?.scrollTo({ top: 0 });
@@ -138,13 +114,10 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
     return docGroups
       .map((group) => ({
         ...group,
-        // Match both languages: a Korean reader sees Korean labels but will still type "Permit2".
-        items: group.items.filter(([label]) =>
-          `${label} ${navLabel(lang, label)}`.toLowerCase().includes(term),
-        ),
+        items: group.items.filter(([label]) => label.toLowerCase().includes(term)),
       }))
       .filter((group) => group.items.length > 0);
-  }, [search, lang]);
+  }, [search]);
 
   return (
     <main className={isDark ? "docs-site docs-dark" : "docs-site"}>
@@ -161,7 +134,6 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
         </nav>
 
         <div className="docs-header-actions">
-          <LangToggle lang={lang} onChange={changeLang} />
           <button
             className="docs-theme-button"
             type="button"
@@ -200,7 +172,7 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
           <nav aria-label={t.docsNav}>
             {filteredGroups.map((group) => (
               <div className="docs-nav-group" key={group.title}>
-                <strong>{navLabel(lang, group.title)}</strong>
+                <strong>{group.title}</strong>
                 {group.items.map(([label, href]) => (
                   <a
                     key={label}
@@ -208,7 +180,7 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
                     href={`#${href}`}
                     onClick={() => setDocsMenuOpen(false)}
                   >
-                    {navLabel(lang, label)}
+                    {label}
                   </a>
                 ))}
               </div>
@@ -233,10 +205,10 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
           <div className="docs-breadcrumb">
             <Link href="/docs">{t.breadcrumbDocs}</Link>
             <span>›</span>
-            <b>{navLabel(lang, "Protocol")}</b>
+            <b>{"Protocol"}</b>
           </div>
 
-          <Section className="docs-hero" id="overview">
+          <section className="docs-hero" id="overview">
             <div className="docs-eyebrow">TECHNICAL DOCUMENTATION</div>
             <h1>Dubu protocol.</h1>
             <p>
@@ -246,9 +218,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
             <div className="docs-meta">
               <span>Chain {GIWA_CHAIN_ID} · GIWA Sepolia</span>
             </div>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="what-is-dubu">
+          <section className="docs-section" id="what-is-dubu">
             <h2>What Dubu is</h2>
             <p>
               Dubu bootstraps liquidity on GIWA, chain {GIWA_CHAIN_ID}, through three products of
@@ -301,9 +273,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
                 </p>
               </div>
             </div>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="architecture">
+          <section className="docs-section" id="architecture">
             <h2>Architecture</h2>
             <p>
               A quote becomes a trade in four movements. The engine is the only writer of prices, the
@@ -394,39 +366,19 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
 
             <h3>We run our own GIWA node</h3>
             <p>
-              The reason for running one is a measurement, not a preference. A public GIWA endpoint
-              answered a laptop 12 times out of 12, and failed roughly 17 percent of the same
-              requests when they came from the aggregator, because a Cloudflare Worker&apos;s egress
-              addresses are shared with the rest of Cloudflare and collide with a public RPC&apos;s
-              per-IP limits that one laptop never reaches. Moving the reads onto a node we operate
-              took quote availability from 62.5 percent to 95.2 percent.
+              Every quote reads chain state, and the engine pushes about fourteen price updates a
+              second across nine pairs. That is more traffic than a public endpoint&apos;s per-IP
+              limit allows. The aggregator makes it worse: it runs on Cloudflare, whose egress
+              addresses are shared, so the limit gets spent by other people&apos;s traffic. Against a
+              public endpoint 17 percent of its requests failed.
             </p>
             <p>
-              The node is op-reth <code>v2.3.0-9384bc5</code>, which is what{" "}
-              <code>web3_clientVersion</code> reports, running as a full GIWA node on our own box.{" "}
-              <code>eth_syncing</code> returns false, <code>net_version</code> is 91342 and the head
-              is around block 32,143,007. It is a node, not the sequencer. GIWA runs the sequencer,
-              and nothing here claims otherwise.
+              So we run a full op-reth node and read our own. There is no quota. It is a node, not
+              the sequencer.
             </p>
-            <p>
-              The engine reads it at <code>http://127.0.0.1:8545</code> and{" "}
-              <code>ws://127.0.0.1:8546</code>, on the same box, so there is no network hop in the
-              read path, which is what a 200 ms cycle needs. Sends go elsewhere: transactions are
-              submitted straight to <code>https://sepolia-sequencer.giwa.io</code>, because a local
-              node started with <code>--rollup.sequencer-http</code> forwards sends and can hold one
-              without ever delivering it.
-            </p>
-            <p>
-              The aggregator runs on Cloudflare and reaches the same node through a{" "}
-              <code>cloudflared</code> tunnel, unit <code>giwa-rpc-tunnel.service</code>, with the
-              two public GIWA endpoints, <code>https://sepolia-rpc-flashblocks.giwa.io</code> and{" "}
-              <code>https://sepolia-rpc.giwa.io</code>, kept as real fallbacks rather than
-              decoration. A watchdog, <code>giwa-rpc-watch.timer</code>, checks the tunnel every
-              five minutes and alerts when it goes stale.
-            </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="engine">
+          <section className="docs-section" id="engine">
             <h2>The engine</h2>
             <p>
               The market maker is a Rust service. Its cycle runs feed, fair value, spread, skew,
@@ -531,9 +483,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               test. That is what lets the aggregator treat an HTTP price from the engine as the
               venue&apos;s own arithmetic.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="contracts">
+          <section className="docs-section" id="contracts">
             <h2>Contracts</h2>
             <p>
               Six contracts, all deployed on GIWA Sepolia and verified on Blockscout. The three
@@ -548,9 +500,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               direction, one funds the adapter instead of the pool. The Router validates that the
               reserved bits between them are clear before it acts on any of it.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="pricing">
+          <section className="docs-section" id="pricing">
             <h2>The pricing model</h2>
             <p>
               A pair costs three hot storage words. One carries the four prices and the timestamp
@@ -626,9 +578,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               price at current usage, which is what a taker arriving now would get on the first unit.
               The engine measures drift against those, not against the stored endpoints.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="capacity">
+          <section className="docs-section" id="capacity">
             <h2>Capacity and capacity epochs</h2>
             <p>
               Capacity is how much base the pool will trade on one side before that side&apos;s ramp
@@ -667,9 +619,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               <code>effectiveCapacity(pairId)</code> returns the post-decay numbers, which is what
               the pool will actually fill right now.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="guards">
+          <section className="docs-section" id="guards">
             <h2>Guards and roles</h2>
             <p>
               A pushed price is a trusted price, so the pool bounds what it will accept and splits
@@ -741,9 +693,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               deployment all four roles are the deployer, which is the one thing here that would be
               wrong on mainnet.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="quote-endpoint">
+          <section className="docs-section" id="quote-endpoint">
             <div className="docs-section-heading">
               <div>
                 <span>DUBU AGGREGATOR</span>
@@ -811,9 +763,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               the quote was taken unverified on that axis, which is a different claim from verified
               and fine.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="markets-endpoint">
+          <section className="docs-section" id="markets-endpoint">
             <div className="docs-section-heading">
               <div>
                 <span>DUBU AGGREGATOR</span>
@@ -833,9 +785,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
             </p>
             <CodeBlock label="Request" code={marketsRequest} />
             <CodeBlock label="200, abridged" code={marketsResponse} />
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="errors">
+          <section className="docs-section" id="errors">
             <h2>Error responses</h2>
             <p>
               Two failures look identical to a user and are not the same fact, so they answer with
@@ -883,9 +835,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
                 </dd>
               </div>
             </div>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="markets">
+          <section className="docs-section" id="markets">
             <h2>Markets</h2>
             <p>
               Nine pairs, every one quoted against mUSDC (6 decimals,{" "}
@@ -901,9 +853,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               and the all-prop point wins on its own. That is the same path a UniV2 outage takes on a
               pair that does have a pool.
             </p>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="integrating">
+          <section className="docs-section" id="integrating">
             <h2>Integrating</h2>
             <p>
               Two calls and one signature. Quote, make sure the Router can move the input, then send
@@ -923,9 +875,9 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
                 </p>
               </div>
             </div>
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="permit2">
+          <section className="docs-section" id="permit2">
             <h2>Permit2</h2>
             <p>
               The Router accepts both entry points. <code>swapExactIn</code> needs a standing ERC-20
@@ -944,22 +896,22 @@ function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => 
               carried across as decoded rather than recomputed.
             </p>
             <CodeBlock label="Quote and execute, Permit2 path" code={permit2Path} />
-          </Section>
+          </section>
 
-          <Section className="docs-section" id="next-steps">
+          <section className="docs-section" id="next-steps">
             <h2>Next steps</h2>
             <div className="docs-next-grid">
               <Link href="/swap"><span>⇄</span><div><strong>Make a swap</strong><p>Open the trading interface.</p></div><b>→</b></Link>
               <Link href="/trade"><span>⌁</span><div><strong>Open advanced trade</strong><p>Charts, limit orders and live pool state.</p></div><b>→</b></Link>
             </div>
-          </Section>
+          </section>
         </article>
 
         <aside className="docs-toc">
           <strong>{t.onThisPage}</strong>
           <nav>
             {toc.map(([label, href]) => (
-              <a key={href} href={`#${href}`}>{navLabel(lang, label)}</a>
+              <a key={href} href={`#${href}`}>{label}</a>
             ))}
           </nav>
         </aside>

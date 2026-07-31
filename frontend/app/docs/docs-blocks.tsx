@@ -1,27 +1,17 @@
+/**
+ * The page's code blocks, tables and diagrams.
+ *
+ * They live here rather than inline so an address or a signature appears once. Imports
+ * `docs-data.ts`, which holds the payloads themselves.
+ */
 "use client";
 
-/**
- * Blocks that render the same in every language: code, ABI signatures, addresses, JSON, and the
- * two diagrams.
- *
- * A Korean section override replaces the whole `<section>`, so anything it wants to keep it has
- * to render. Rendering *these* components, rather than pasting their contents into `ko.tsx`, is
- * what makes an address or an ABI signature physically unable to differ between the two
- * languages.
- *
- * That rule is enforceable in one line. Any hit means someone pasted a payload into a translation
- * instead of importing it, and the copy will go stale the next time a contract moves:
- *
- *   grep -nE '0x[0-9a-fA-F]{8}|curl |HTTP [45][0-9]{2}|"error":|\(address,' app/docs/ko.tsx
- *
- * Imports `docs-data.ts` and `docs-lang.tsx`, both leaves. Never imports `ko.tsx`.
- */
 
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { EXPLORER_ADDRESS, contracts, type ContractName } from "./docs-data";
 import { MARKETS, TOKENS } from "@/app/lib/dubu";
-import { UI, useLang } from "./docs-lang";
+import { UI } from "./docs-lang";
 
 /**
  * Inline code, marked as an English island.
@@ -40,7 +30,7 @@ export function C({ children }: { children: ReactNode }) {
 
 export function CodeBlock({ label, code }: { label: string; code: string }) {
   const [copied, setCopied] = useState(false);
-  const t = UI[useLang()];
+  const t = UI;
 
   return (
     <div className="docs-code-block">
