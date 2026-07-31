@@ -602,6 +602,224 @@
 .code-gold { color: #e9b56c; }
 .code-green { color: #9ed39f; }
 
+.docs-section h3 {
+  margin: 34px 0 10px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.docs-section h4 {
+  margin: 24px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.docs-section > ul,
+.docs-section > ol {
+  margin: 0 0 17px;
+  padding-left: 19px;
+  color: var(--docs-muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.docs-section li + li {
+  margin-top: 7px;
+}
+
+.docs-section li strong,
+.docs-section > p strong {
+  color: var(--docs-ink);
+}
+
+.docs-site code {
+  padding: 1px 5px;
+  border: 1px solid var(--docs-line);
+  border-radius: 5px;
+  background: var(--docs-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
+  word-break: break-word;
+}
+
+.docs-code-block code,
+.docs-table code,
+.docs-definition-list code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.docs-table-wrap {
+  margin-top: 25px;
+  overflow-x: auto;
+  border: 1px solid var(--docs-line);
+  border-radius: 15px;
+  background: var(--docs-surface);
+  -webkit-overflow-scrolling: touch;
+}
+
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: left;
+}
+
+.docs-table th {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--docs-line);
+  color: var(--docs-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.docs-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--docs-line);
+  color: var(--docs-muted);
+  line-height: 1.6;
+  vertical-align: top;
+}
+
+.docs-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.docs-table td:first-child {
+  color: var(--docs-ink);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.docs-table a {
+  color: var(--docs-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.docs-table td:nth-child(3) {
+  min-width: 260px;
+}
+
+.docs-table .docs-entrypoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 210px;
+}
+
+.docs-table .docs-entrypoints span {
+  padding: 2px 6px;
+  border: 1px solid var(--docs-line);
+  border-radius: 5px;
+  background: var(--docs-soft);
+  color: var(--docs-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.docs-figure {
+  margin: 27px 0 0;
+  padding: 20px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--docs-line);
+  border-radius: 15px;
+  background: var(--docs-surface);
+}
+
+.docs-figure svg {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+.docs-figure figcaption {
+  margin-top: 14px;
+  color: var(--docs-muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.docs-svg-panel {
+  fill: var(--docs-soft);
+  stroke: var(--docs-line);
+}
+
+.docs-svg-accent {
+  fill: none;
+  stroke: var(--docs-accent);
+  stroke-width: 2;
+}
+
+.docs-svg-line {
+  fill: none;
+  stroke: var(--docs-muted);
+  stroke-width: 1;
+}
+
+/* Markers resolve against <defs>, not the referencing path, so this needs its own fill. */
+.docs-svg-arrowhead {
+  fill: var(--docs-muted);
+  stroke: none;
+}
+
+.docs-svg-label {
+  fill: var(--docs-ink);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.docs-svg-sub {
+  fill: var(--docs-muted);
+  font-size: 9px;
+}
+
+.docs-svg-tag {
+  fill: var(--docs-accent);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.docs-http {
+  margin-top: 25px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+}
+
+.docs-http span {
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #fffaf3;
+  background: var(--docs-accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.docs-http code {
+  border: 0;
+  background: transparent;
+  color: var(--docs-ink);
+  word-break: break-all;
+}
+
+.docs-code-block + .docs-code-block {
+  margin-top: 13px;
+}
+
 .docs-next-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -919,5 +1137,68 @@
   .docs-section-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .docs-table-wrap {
+    overflow-x: visible;
+  }
+
+  .docs-table,
+  .docs-table tbody,
+  .docs-table tr,
+  .docs-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .docs-table thead {
+    display: none;
+  }
+
+  .docs-table tr {
+    padding: 16px;
+    border-bottom: 1px solid var(--docs-line);
+  }
+
+  .docs-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .docs-table td {
+    padding: 5px 0;
+    border: 0;
+  }
+
+  .docs-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    color: var(--docs-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .docs-table td:nth-child(3) {
+    min-width: 0;
+  }
+
+  .docs-table a {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .docs-table .docs-entrypoints {
+    min-width: 0;
+  }
+
+  .docs-table .docs-entrypoints span {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .docs-figure {
+    padding: 16px 14px;
   }
 }
