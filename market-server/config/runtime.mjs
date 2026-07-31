@@ -27,6 +27,9 @@ export function loadRuntimeConfig() {
     binanceRestUrl: process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision",
     binanceWebSocketUrl:
       process.env.BINANCE_WEBSOCKET_URL ?? "wss://data-stream.binance.vision/stream",
+    hyperliquidInfoUrl: process.env.HYPERLIQUID_INFO_URL ?? "https://api.hyperliquid.xyz/info",
+    hyperliquidWebSocketUrl:
+      process.env.HYPERLIQUID_WEBSOCKET_URL ?? "wss://api.hyperliquid.xyz/ws",
     giwaRpcUrl: process.env.GIWA_RPC_URL ?? "https://sepolia-rpc.giwa.io",
     aggregatorUrl:
       process.env.DUBU_AGGREGATOR_URL ?? "https://dubu-aggregator.polyrose.workers.dev",

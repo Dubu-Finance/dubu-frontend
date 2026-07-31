@@ -99,18 +99,41 @@ export class MarketRepository {
     }));
   }
 
-  async getLatestOpenTime(marketId) {
+  /**
+   * Newest candle that a REST catch-up wrote, ignoring anything the live stream persisted.
+   *
+   * The live indexer starts before the startup catch-up and writes the current bucket within a
+   * second, so a plain "newest candle" would tell the catch-up it is already up to date and it
+   * would fetch nothing. Every history writer labels its rows with the provider name and only
+   * the indexer appends `-live`, which is what separates the two here.
+   */
+  async getLatestBackfilledOpenTime(marketId) {
     const result = await this.pool.query(
       `
         SELECT open_time
         FROM candles
-        WHERE market_id = $1 AND interval = '5m'
+        WHERE market_id = $1 AND interval = '5m' AND source NOT LIKE '%-live'
         ORDER BY open_time DESC
         LIMIT 1
       `,
       [marketId],
     );
     return result.rows[0] ? Number(result.rows[0].open_time) : null;
+  }
+
+  /** Highest high and lowest low since `since`, for tickers whose upstream omits them. */
+  async getDayRange(marketId, since) {
+    const result = await this.pool.query(
+      `
+        SELECT MAX(high) AS high, MIN(low) AS low
+        FROM candles
+        WHERE market_id = $1 AND interval = '5m' AND open_time >= $2
+      `,
+      [marketId, since],
+    );
+    const row = result.rows[0];
+    if (!row || row.high === null || row.low === null) return null;
+    return { high: Number(row.high), low: Number(row.low) };
   }
 
   async getCandles(marketId, intervalMs, limit) {
@@ -142,7 +165,7 @@ export class MarketRepository {
     return result.rows.map(normalizeCandle);
   }
 
-  async saveCandle(marketId, candle, source = "binance-live") {
+  async saveCandle(marketId, candle, source) {
     await upsertCandles(this.pool, marketId, "5m", [candle], source);
   }
 }

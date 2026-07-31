@@ -33,13 +33,19 @@ async function start() {
     pool,
     repository,
     markets: MARKETS,
-    restUrl: config.binanceRestUrl,
+    restUrls: {
+      binance: config.binanceRestUrl,
+      hyperliquid: config.hyperliquidInfoUrl,
+    },
   });
   const liveIndexer = new LiveIndexer({
     repository,
     hub,
     markets: MARKETS,
-    webSocketUrl: config.binanceWebSocketUrl,
+    webSocketUrls: {
+      binance: config.binanceWebSocketUrl,
+      hyperliquid: config.hyperliquidWebSocketUrl,
+    },
   });
   const orderService = new OrderService({
     repository: orderRepository,

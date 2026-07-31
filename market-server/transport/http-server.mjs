@@ -62,6 +62,7 @@ export function createMarketHttpServer({
           status: "ok",
           database: "connected",
           indexer: liveIndexer.status,
+          streams: liveIndexer.statusByProvider,
           backfill: backfillService.running ? "running" : "idle",
           limitOrders: orderService.enabled ? "active" : "disabled",
           timestamp: Date.now(),

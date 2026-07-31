@@ -91,9 +91,9 @@ const pairs: Record<PairKey, {
   "mBNB/mUSDC": { base: "mBNB", quote: "mUSDC", dataId: "mbnb-musdc" },
   "mXRP/mUSDC": { base: "mXRP", quote: "mUSDC", dataId: "mxrp-musdc" },
   "mSOL/mUSDC": { base: "mSOL", quote: "mUSDC", dataId: "msol-musdc" },
-  "mSKHY/mUSDC": { base: "mSKHY", quote: "mUSDC", dataId: null },
-  "mAAPL/mUSDC": { base: "mAAPL", quote: "mUSDC", dataId: null },
-  "mTSLA/mUSDC": { base: "mTSLA", quote: "mUSDC", dataId: null },
+  "mSKHY/mUSDC": { base: "mSKHY", quote: "mUSDC", dataId: "mskhy-musdc" },
+  "mAAPL/mUSDC": { base: "mAAPL", quote: "mUSDC", dataId: "maapl-musdc" },
+  "mTSLA/mUSDC": { base: "mTSLA", quote: "mUSDC", dataId: "mtsla-musdc" },
 };
 
 const pairKeys = Object.keys(pairs) as PairKey[];
@@ -466,7 +466,10 @@ export default function TradePage() {
     onSubmitted: clearAmount,
   });
   // The market swap is gated on the aggregator's markets rather than on `marketDataAvailable`:
-  // the equity pairs carry `dataId: null` and so have no chart feed, but they quote and fill.
+  // a pair that quotes and fills stays tradable even when its chart feed is down. The two used to
+  // disagree permanently, because the equity pairs had no feed at all until they were pointed at
+  // Hyperliquid; they would disagree again for a pair listed onchain before the market server
+  // learns to track it.
   const marketQuotable = hasMarket(paySymbol, receiveSymbol)
     && isMarketConfigured(paySymbol, receiveSymbol);
   const executionPrice = mode === "Limit"

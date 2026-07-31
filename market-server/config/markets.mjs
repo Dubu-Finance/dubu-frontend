@@ -48,9 +48,44 @@ export const MARKETS = Object.freeze([
     provider: "binance",
     providerSymbol: "SOLUSDT",
   },
+  // Binance lists no equities, so the three stock pairs track the `xyz` perp DEX on
+  // Hyperliquid instead. Its coin names carry the deploying DEX as a prefix and both the
+  // info endpoint and the WebSocket want that full string, so `providerSymbol` keeps it.
+  {
+    id: "maapl-musdc",
+    displaySymbol: "mAAPL/mUSDC",
+    baseToken: "mAAPL",
+    quoteToken: "mUSDC",
+    provider: "hyperliquid",
+    providerSymbol: "xyz:AAPL",
+  },
+  {
+    id: "mtsla-musdc",
+    displaySymbol: "mTSLA/mUSDC",
+    baseToken: "mTSLA",
+    quoteToken: "mUSDC",
+    provider: "hyperliquid",
+    providerSymbol: "xyz:TSLA",
+  },
+  {
+    id: "mskhy-musdc",
+    displaySymbol: "mSKHY/mUSDC",
+    baseToken: "mSKHY",
+    quoteToken: "mUSDC",
+    provider: "hyperliquid",
+    providerSymbol: "xyz:SKHY",
+  },
 ]);
 
 export const MARKET_BY_ID = new Map(MARKETS.map((market) => [market.id, market]));
-export const MARKET_BY_PROVIDER_SYMBOL = new Map(
-  MARKETS.map((market) => [market.providerSymbol, market]),
-);
+
+/** Groups markets by upstream so each provider adapter only sees the symbols it can serve. */
+export function marketsByProvider(markets) {
+  const grouped = new Map();
+  for (const market of markets) {
+    const existing = grouped.get(market.provider);
+    if (existing) existing.push(market);
+    else grouped.set(market.provider, [market]);
+  }
+  return grouped;
+}
