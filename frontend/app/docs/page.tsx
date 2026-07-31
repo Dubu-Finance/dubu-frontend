@@ -2,14 +2,29 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AGGREGATOR, CONTRACTS, EXPLORER, GIWA_CHAIN_ID, MARKETS, TOKENS } from "@/app/lib/dubu";
+import { AGGREGATOR, GIWA_CHAIN_ID, TOKENS } from "@/app/lib/dubu";
+import {
+  ArchitectureDiagram,
+  CodeBlock,
+  ContractsTable,
+  MarketsTable,
+  QuoteWordDiagram,
+} from "./docs-blocks";
+import {
+  PERMIT2,
+  approvePath,
+  errorNoMarket,
+  errorNoVenue,
+  errorRepricing,
+  marketsRequest,
+  marketsResponse,
+  permit2Path,
+  quoteRequest,
+  quoteResponse,
+  wordLayout,
+} from "./docs-data";
+import { type Lang, LangProvider, LangToggle, Section, UI, navLabel, useDocsLang } from "./docs-i18n";
 import "./docs.css";
-
-const EXPLORER_ADDRESS = `${EXPLORER}/address`;
-const PROP_ADAPTER = "0x16C5A0df5Ad0c8b0A450eDaa67c56593B02D19e2";
-const UNIV2_ADAPTER = "0xA7383784E39d2d3C717C61735A363654360DeF46";
-const PMM_ADAPTER = "0x92CC1139212d02c8CF198dE804161432feEa4eBD";
-const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 const docGroups = [
   {
@@ -30,7 +45,7 @@ const docGroups = [
     ],
   },
   {
-    title: "Aggregator API",
+    title: "Dubu Aggregator",
     items: [
       ["POST /quote", "quote-endpoint"],
       ["GET /markets", "markets-endpoint"],
@@ -48,515 +63,52 @@ const docGroups = [
 ] as const;
 
 const toc = [
-  ["What DuBu is", "overview"],
+  ["What Dubu is", "overview"],
   ["Architecture", "architecture"],
   ["The engine", "engine"],
   ["Contracts", "contracts"],
   ["Pricing model", "pricing"],
   ["Capacity and epochs", "capacity"],
   ["Guards and roles", "guards"],
-  ["Aggregator API", "quote-endpoint"],
+  ["Dubu Aggregator API", "quote-endpoint"],
   ["Errors", "errors"],
   ["Markets", "markets"],
   ["Integrating", "integrating"],
 ] as const;
 
-const contracts = [
-  {
-    name: "PropPool",
-    address: CONTRACTS.propPool,
-    what: "The proprietary-inventory AMM. Holds the reserves, stores one four-point ladder per pair, and fills takers against it out of its own book.",
-    entries: [
-      "updateQuote(uint256[])",
-      "refreshCapacity(uint16,uint96,uint96)",
-      "refreshCapacityBatch(uint256[])",
-      "swap(address,address,int256,uint256,address,uint256,uint256)",
-      "swapWithContractBalance(address,address,uint256,address,uint256,uint256)",
-      "getAmountOut / getAmountIn",
-      "quoteByPair(uint16,bool,uint256)",
-      "snapshot(uint16)",
-      "effectiveCapacity(uint16)",
-    ],
-  },
-  {
-    name: "Router",
-    address: CONTRACTS.router,
-    what: "A pure executor. Pulls tokenIn, divides it by weight across adapters, enforces one route-wide minimum, and forwards tokenOut. It never picks a venue.",
-    entries: [
-      "swapExactIn(RouteParams,uint256)",
-      "swapExactOut(RouteParams,uint256,uint256)",
-      "swapExactInWithPermit2(RouteParams,uint256,PermitTransferFrom,bytes)",
-      "swapExactOutWithPermit2(RouteParams,uint256,uint256,PermitTransferFrom,bytes)",
-    ],
-  },
-  {
-    name: "PmmSettle",
-    address: CONTRACTS.pmmSettle,
-    what: "RFQ settlement. Verifies an EIP-712 order signed by the maker and moves both legs with transferFrom. It custodies nothing and supports partial fills.",
-    entries: [
-      "fillOrder(Order,bytes,uint256,uint32,address)",
-      "hashOrder(Order)",
-      "previewFill(Order,uint256,uint256)",
-      "remainingTaker(Order)",
-      "cancelNonce(uint64)",
-      "DOMAIN_SEPARATOR()",
-    ],
-  },
-  {
-    name: "PropPoolAdapter",
-    address: PROP_ADAPTER,
-    what: "Router-side shim for PropPool. Decodes a 160-byte (base, quote, limitAmount, partnerId, deadline) payload and calls swapWithContractBalance.",
-    entries: [
-      "sellBase(address,address,bytes)",
-      "sellQuote(address,address,bytes)",
-      "encodePayload(address,address,uint256,uint256,uint256)",
-    ],
-  },
-  {
-    name: "UniV2Adapter",
-    address: UNIV2_ADAPTER,
-    what: "Router-side shim for a UniswapV2 pair. Sizes the swap from the pair's own balance delta and applies the 0.30 percent constant-product formula.",
-    entries: [
-      "sellBase(address,address,bytes)",
-      "sellQuote(address,address,bytes)",
-      "getAmountOut(uint256,uint256,uint256)",
-    ],
-  },
-  {
-    name: "PmmAdapter",
-    address: PMM_ADAPTER,
-    what: "Router-side shim for PmmSettle. Fills the lesser of what it was funded and what the order has left, then returns any remainder.",
-    entries: [
-      "sellBase(address,address,bytes)",
-      "sellQuote(address,address,bytes)",
-      "encodePayload(Order,bytes,uint32)",
-    ],
-  },
-];
-
-const quoteRequest = `curl -s -X POST ${AGGREGATOR}/quote \\
-  -H 'content-type: application/json' \\
-  -d '{
-    "tokenIn":     "${TOKENS.mUSDC.address}",
-    "tokenOut":    "${TOKENS.mWETH.address}",
-    "amountIn":    "1000000000",
-    "receiver":    "0x5AD176eBb13CAbE62Ee7c07F52a67b4A48CbEf83",
-    "slippageBps": 50
-  }'`;
-
-const quoteResponse = `{
-  "market": "mWETH/mUSDC",
-  "tokenIn": "0xd28596C6750D87C53EA146134AfAB53de86C5155",
-  "tokenOut": "0x81e46C6379498beBEB5DCcD47ab2DdFaf967d445",
-  "amountIn": "1000000000",
-  "amountOut": "524438489691532502",
-  "minAmountOut": "521816297243074839",
-  "slippageBps": 50,
-  "deadline": "1785478101",
-  "route": {
-    "to": "0x2B10D0b50ca3A7c0C7CCaBc969615b4Db3fb9471",
-    "data": "0x2037eb8e00000000000000000000000000000000000000000000000000000000
-             00000040000000000000000000000000000000000000000000000000073ddd28
-             5b2ee117 ... 900 bytes total",
-    "value": "0x0",
-    "venues": ["prop"]
-  },
-  "detail": {
-    "prop": "524438489691532502",
-    "univ2": "522021457973787776",
-    "rfq": "524156054896774516",
-    "rfqRejected": null,
-    "rfqMakerReason": null,
-    "rfqMakerCanDeliver": "463486574883963348339",
-    "split": false,
-    "legs": [
-      {
-        "venue": "prop",
-        "weightBps": 10000,
-        "amountIn": "1000000000",
-        "amountOut": "524438489691532502"
-      }
-    ]
-  },
-  "approve": {
-    "token": "0xd28596C6750D87C53EA146134AfAB53de86C5155",
-    "spender": "0x2B10D0b50ca3A7c0C7CCaBc969615b4Db3fb9471",
-    "amountIn": "1000000000"
-  }
-}`;
-
-const marketsRequest = `curl -s ${AGGREGATOR}/markets`;
-
-const marketsResponse = `{
-  "chainId": 91342,
-  "rfq": true,
-  "markets": [
-    {
-      "pairId": 1,
-      "symbol": "mWETH/mUSDC",
-      "base": "0x81e46C6379498beBEB5DCcD47ab2DdFaf967d445",
-      "quote": "0xd28596C6750D87C53EA146134AfAB53de86C5155",
-      "baseDecimals": 18,
-      "quoteDecimals": 6
-    },
-    {
-      "pairId": 2,
-      "symbol": "mWBTC/mUSDC",
-      "base": "0x3548991B5EF2D7805EFa95bEa6CeDeAee3869875",
-      "quote": "0xd28596C6750D87C53EA146134AfAB53de86C5155",
-      "baseDecimals": 8,
-      "quoteDecimals": 6
-    },
-    ... seven more, through pairId 9
-  ]
-}`;
-
-const errorNoVenue = `HTTP 404
-{
-  "error": "no venue would fill that size",
-  "detail": "Every venue returned zero. On the prop side that is spent epoch
-             capacity, which refills on the next epoch, or a stale quote, a
-             paused pair, or an engine that could not be reached. A pause can
-             be a latched killswitch, so none of those last three is known to
-             clear without an operator. A side withdrawn to re-price answers
-             503 rather than this.",
-  "solo": { "prop": "0", "univ2": "0" }
-}`;
-
-const errorRepricing = `HTTP 503
-{
-  "error": "the pair is temporarily re-pricing",
-  "detail": "The prop pool has withdrawn its quotes for this side after a
-             price move, and no other venue would fill that size. The
-             withdrawal is a cool-off measured in tens of seconds, so the
-             same request is worth retrying.",
-  "retryable": true,
-  "solo": { "prop": "0", "univ2": "0" }
-}`;
-
-const errorNoMarket = `HTTP 400
-{
-  "error": "no market for that token pair",
-  "markets": [
-    "mWETH/mUSDC", "mWBTC/mUSDC", "mBNB/mUSDC",
-    "mXRP/mUSDC",  "mSOL/mUSDC",  "mAAPL/mUSDC",
-    "mTSLA/mUSDC", "mSKHY/mUSDC", "mSPCX/mUSDC"
-  ]
-}`;
-
-const approvePath = `import { BrowserProvider, Contract, MaxUint256 } from "ethers";
-
-const AGGREGATOR = "${AGGREGATOR}";
-
-const ERC20 = [
-  "function allowance(address,address) view returns (uint256)",
-  "function approve(address,uint256) returns (bool)",
-];
-
-export async function swap(tokenIn, tokenOut, amountIn) {
-  const provider = new BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  const receiver = await signer.getAddress();
-
-  const res = await fetch(\`\${AGGREGATOR}/quote\`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      tokenIn,
-      tokenOut,
-      amountIn: amountIn.toString(),
-      receiver,
-      slippageBps: 50,
-    }),
-  });
-  const quote = await res.json();
-  if (quote.error) throw new Error(quote.error);
-
-  // The Router is the spender on every route, RFQ included.
-  const erc20 = new Contract(quote.approve.token, ERC20, signer);
-  const allowed = await erc20.allowance(receiver, quote.approve.spender);
-  if (allowed < amountIn) {
-    await (await erc20.approve(quote.approve.spender, MaxUint256)).wait();
-  }
-
-  // Send it unmodified: minAmountOut, receiver and deadline are all inside.
-  const tx = await signer.sendTransaction({
-    to: quote.route.to,
-    data: quote.route.data,
-    value: quote.route.value,
-  });
-  return tx.wait();
-}`;
-
-const permit2Path = `import { BrowserProvider, Contract, Interface, MaxUint256 } from "ethers";
-
-const ROUTER = "${CONTRACTS.router}";
-const PERMIT2 = "${PERMIT2}";
-
-const ROUTE_PARAMS =
-  "tuple(address tokenIn,address tokenOut,address receiver,uint256 amountIn," +
-  "uint256 quotedAmountOut,uint256 deadline," +
-  "tuple(uint16 weightBps,tuple(address tokenIn," +
-  "tuple(address adapter,uint256 rawData,bytes payload)[] steps)[] hops)[] batches)";
-
-const router = new Interface([
-  \`function swapExactIn(\${ROUTE_PARAMS} p, uint256 minAmountOut)\` +
-    " returns (uint256)",
-  \`function swapExactInWithPermit2(\${ROUTE_PARAMS} p, uint256 minAmountOut,\` +
-    " tuple(tuple(address token,uint256 amount) permitted," +
-    "uint256 nonce,uint256 deadline) permit, bytes signature)" +
-    " returns (uint256)",
-]);
-
-// Takes the quote body from the call above.
-export async function swapWithPermit2(quote) {
-  const provider = new BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  const owner = await signer.getAddress();
-
-  // One standing approval, to Permit2 rather than to the Router.
-  const erc20 = new Contract(
-    quote.approve.token,
-    ["function allowance(address,address) view returns (uint256)",
-     "function approve(address,uint256) returns (bool)"],
-    signer,
-  );
-  if ((await erc20.allowance(owner, PERMIT2)) === 0n) {
-    await (await erc20.approve(PERMIT2, MaxUint256)).wait();
-  }
-
-  // The aggregator encodes swapExactIn. Lift the plan out and re-target it.
-  const [routeParams, minAmountOut] = router.decodeFunctionData(
-    "swapExactIn",
-    quote.route.data,
-  );
-
-  const permit = {
-    permitted: { token: quote.approve.token, amount: quote.amountIn },
-    nonce: BigInt(Date.now()),
-    deadline: BigInt(quote.deadline),
-  };
-
-  const signature = await signer.signTypedData(
-    { name: "Permit2", chainId: ${GIWA_CHAIN_ID}, verifyingContract: PERMIT2 },
-    {
-      PermitTransferFrom: [
-        { name: "permitted", type: "TokenPermissions" },
-        { name: "spender", type: "address" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" },
-      ],
-      TokenPermissions: [
-        { name: "token", type: "address" },
-        { name: "amount", type: "uint256" },
-      ],
-    },
-    { ...permit, spender: ROUTER },
-  );
-
-  const tx = await signer.sendTransaction({
-    to: ROUTER,
-    data: router.encodeFunctionData("swapExactInWithPermit2", [
-      routeParams,
-      minAmountOut,
-      permit,
-      signature,
-    ]),
-  });
-  return tx.wait();
-}`;
-
-const wordLayout = `quote word     [255:224]  updatedAt (uint32)    [223:168]  maxAsk (uint56)
-               [167:112]  minAsk (uint56)       [111:56]   maxBid (uint56)
-               [55:0]     minBid (uint56)
-
-capacity word  [255:240]  decaySecs (uint16)    [239:224]  flags (bit 224 = paused)
-               [223:192]  capGen (uint32)       [191:96]   askCapacity (uint96)
-               [95:0]     bidCapacity (uint96)
-
-used word      [223:192]  usedGen (uint32)      [191:96]   askUsed (uint96)
-               [95:0]     bidUsed (uint96)
-
-updateQuote takes the quote word before the stamp is applied:
-               [239:224]  pairId (uint16)       [223:0]    the four prices
-               [255:240]  read by nothing; masked off with the rest of [255:224]`;
-
-function CodeBlock({ label, code }: { label: string; code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <div className="docs-code-block">
-      <div className="docs-code-head">
-        <span>{label}</span>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard.writeText(code);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1_400);
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      <pre>{code}</pre>
-    </div>
-  );
-}
-
-function ArchitectureDiagram() {
-  return (
-    <figure className="docs-figure">
-      <svg
-        viewBox="0 0 860 430"
-        role="img"
-        aria-label="The engine pushes a ladder to PropPool and prices the prop leg for the aggregator; the aggregator returns calldata; the wallet signs it to the Router, which executes against PropPool, the UniswapV2 pair and PmmSettle."
-      >
-        <defs>
-          <marker id="docs-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
-            <path d="M0 0 L6 3 L0 6 z" className="docs-svg-arrowhead" />
-          </marker>
-        </defs>
-
-        <g className="docs-svg-line" strokeDasharray="4 5">
-          <path d="M10 150 H 850" />
-        </g>
-        <text className="docs-svg-tag" x="762" y="144">OFF CHAIN</text>
-        <text className="docs-svg-tag" x="774" y="166">ON CHAIN</text>
-
-        <g className="docs-svg-line" markerEnd="url(#docs-arrow)">
-          <path d="M200 70 H 314" />
-          <path d="M520 70 H 644" />
-          <path d="M745 106 V 164" />
-          <path d="M70 106 V 314" />
-          <path d="M700 234 V 274 H 150 V 314" />
-          <path d="M700 274 H 400 V 314" />
-          <path d="M700 274 H 630 V 314" />
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="20" y="34" width="180" height="72" rx="12" />
-          <text className="docs-svg-label" x="36" y="62">Engine</text>
-          <text className="docs-svg-sub" x="36" y="80">Rust market maker</text>
-          <text className="docs-svg-sub" x="36" y="95">feed to ladder, 200 ms</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="320" y="34" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="336" y="62">Aggregator</text>
-          <text className="docs-svg-sub" x="336" y="80">Cloudflare Worker</text>
-          <text className="docs-svg-sub" x="336" y="95">11-point split search</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="644" y="34" width="192" height="72" rx="12" />
-          <text className="docs-svg-label" x="660" y="62">Wallet</text>
-          <text className="docs-svg-sub" x="660" y="80">signs to + data</text>
-          <text className="docs-svg-sub" x="660" y="95">no custody anywhere</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="644" y="164" width="192" height="70" rx="12" />
-          <text className="docs-svg-label" x="660" y="192">Router</text>
-          <text className="docs-svg-sub" x="660" y="210">divides by weightBps</text>
-          <text className="docs-svg-sub" x="660" y="225">enforces minAmountOut</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="20" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="36" y="342">PropPool</text>
-          <text className="docs-svg-sub" x="36" y="360">own inventory</text>
-          <text className="docs-svg-sub" x="36" y="375">four-point ladder</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="300" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="316" y="342">UniswapV2 pair</text>
-          <text className="docs-svg-sub" x="316" y="360">constant product</text>
-          <text className="docs-svg-sub" x="316" y="375">two pairs of the nine</text>
-        </g>
-
-        <g>
-          <rect className="docs-svg-panel" x="560" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="576" y="342">PmmSettle</text>
-          <text className="docs-svg-sub" x="576" y="360">signed RFQ order</text>
-          <text className="docs-svg-sub" x="576" y="375">maker inventory</text>
-        </g>
-
-        <text className="docs-svg-sub" x="206" y="60">prop prices</text>
-        <text className="docs-svg-sub" x="526" y="60">to + data</text>
-        <text className="docs-svg-sub" x="752" y="142">signed tx</text>
-        <text className="docs-svg-sub" x="80" y="200">updateQuote</text>
-        <text className="docs-svg-sub" x="80" y="216">refreshCapacity</text>
-        <text className="docs-svg-sub" x="404" y="268">sellBase / sellQuote</text>
-      </svg>
-      <figcaption>
-        The engine is the only writer of prices, the aggregator is the only component that compares
-        venues, and the Router is the only one that moves funds. The aggregator reads the UniswapV2
-        pair on chain through Multicall3 and takes the prop price from the engine over HTTP, for the
-        reason given below.
-      </figcaption>
-    </figure>
-  );
-}
-
-function LadderDiagram() {
-  return (
-    <figure className="docs-figure">
-      <svg
-        viewBox="0 0 860 230"
-        role="img"
-        aria-label="The four-point ladder. Bids walk down from maxBid to minBid as bid capacity is consumed; asks walk up from minAsk to maxAsk."
-      >
-        <line className="docs-svg-line" x1="60" y1="152" x2="810" y2="152" />
-
-        <g className="docs-svg-accent">
-          <path d="M120 98 L 396 130" />
-          <path d="M474 130 L 750 98" />
-        </g>
-
-        <g className="docs-svg-line" strokeDasharray="3 3">
-          <path d="M120 98 V 152" />
-          <path d="M396 130 V 152" />
-          <path d="M474 130 V 152" />
-          <path d="M750 98 V 152" />
-        </g>
-
-        <g className="docs-svg-label">
-          <text x="86" y="88">maxBid</text>
-          <text x="364" y="120">minBid</text>
-          <text x="446" y="120">minAsk</text>
-          <text x="712" y="88">maxAsk</text>
-        </g>
-
-        <g className="docs-svg-sub">
-          <text x="86" y="172">bidUsed = 0</text>
-          <text x="330" y="172">bidUsed = bidCapacity</text>
-          <text x="446" y="172">askUsed = 0</text>
-          <text x="676" y="172">askUsed = askCapacity</text>
-          <text x="60" y="42">The pool sells base on the ask side. What it charges walks up as the epoch is consumed.</text>
-          <text x="60" y="206">The pool buys base on the bid side. What it pays walks down as the epoch is consumed.</text>
-        </g>
-
-        <text className="docs-svg-tag" x="196" y="66">BID SIDE</text>
-        <text className="docs-svg-tag" x="566" y="66">ASK SIDE</text>
-      </svg>
-      <figcaption>
-        Four <code>uint56</code> prices in one storage word. <code>validateLadder</code> requires
-        <code>minBid &le; maxBid &le; minAsk &le; maxAsk</code> and <code>maxAsk &gt; minBid</code>,
-        so the two sides may touch but never cross.
-      </figcaption>
-    </figure>
-  );
-}
-
 export default function DocsPage() {
+  const { lang, setLang } = useDocsLang();
+
+  // The provider is above the page rather than inside it so that Section and CodeBlock can read
+  // the language without it being drilled through fifteen call sites.
+  return (
+    <LangProvider lang={lang}>
+      <DocsPageBody lang={lang} setLang={setLang} />
+    </LangProvider>
+  );
+}
+
+function DocsPageBody({ lang, setLang }: { lang: Lang; setLang: (next: Lang) => void }) {
   const [isDark, setIsDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [docsMenuOpen, setDocsMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeId, setActiveId] = useState("overview");
   const sidebarRef = useRef<HTMLElement>(null);
+  const t = UI[lang];
+
+  // Korean runs shorter than English, so a mid-page toggle would drop the reader somewhere else
+  // entirely. The sidebar already tracks the section they are reading; put them back on it.
+  // .docs-section carries scroll-margin-top, so this clears the sticky header for free.
+  const changeLang = (next: Lang) => {
+    const anchor = activeId;
+    const scrolled = window.scrollY > 8;
+    setLang(next);
+    if (!scrolled) return;
+    requestAnimationFrame(() => {
+      document.getElementById(anchor)?.scrollIntoView({ block: "start" });
+    });
+  };
 
   useEffect(() => {
     if (docsMenuOpen) sidebarRef.current?.scrollTo({ top: 0 });
@@ -586,39 +138,43 @@ export default function DocsPage() {
     return docGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter(([label]) => label.toLowerCase().includes(term)),
+        // Match both languages: a Korean reader sees Korean labels but will still type "Permit2".
+        items: group.items.filter(([label]) =>
+          `${label} ${navLabel(lang, label)}`.toLowerCase().includes(term),
+        ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [search]);
+  }, [search, lang]);
 
   return (
     <main className={isDark ? "docs-site docs-dark" : "docs-site"}>
       <header className="docs-header">
-        <Link className="docs-brand" href="/" aria-label="Dubu home">
+        <Link className="docs-brand" href="/" aria-label={t.brandHome}>
           <img src="/assets/Logo.png" alt="Dubu" />
         </Link>
 
-        <nav className={menuOpen ? "docs-top-nav open" : "docs-top-nav"} aria-label="Primary navigation">
-          <Link href="/swap" onClick={() => setMenuOpen(false)}>Swap</Link>
-          <Link href="/#why" onClick={() => setMenuOpen(false)}>Why Dubu</Link>
-          <Link href="/#routing" onClick={() => setMenuOpen(false)}>Routing</Link>
-          <Link className="active" href="/docs" onClick={() => setMenuOpen(false)}>Docs</Link>
+        <nav className={menuOpen ? "docs-top-nav open" : "docs-top-nav"} aria-label={t.primaryNav}>
+          <Link href="/swap" onClick={() => setMenuOpen(false)}>{t.navSwap}</Link>
+          <Link href="/#why" onClick={() => setMenuOpen(false)}>{t.navWhy}</Link>
+          <Link href="/#routing" onClick={() => setMenuOpen(false)}>{t.navRouting}</Link>
+          <Link className="active" href="/docs" onClick={() => setMenuOpen(false)}>{t.navDocs}</Link>
         </nav>
 
         <div className="docs-header-actions">
+          <LangToggle lang={lang} onChange={changeLang} />
           <button
             className="docs-theme-button"
             type="button"
-            aria-label={isDark ? "Use light theme" : "Use dark theme"}
+            aria-label={isDark ? t.themeLight : t.themeDark}
             onClick={() => setIsDark((current) => !current)}
           >
             {isDark ? "☀" : "◔"}
           </button>
-          <Link className="docs-launch-button" href="/swap">Launch app <span>↗</span></Link>
+          <Link className="docs-launch-button" href="/swap">{t.launchApp} <span>↗</span></Link>
           <button
             className="docs-menu-button"
             type="button"
-            aria-label="Toggle navigation"
+            aria-label={t.toggleNav}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((current) => !current)}
           >
@@ -634,17 +190,17 @@ export default function DocsPage() {
             <span>⌕</span>
             <input
               value={search}
-              aria-label="Search documentation"
-              placeholder="Search docs"
+              aria-label={t.searchAria}
+              placeholder={t.searchPlaceholder}
               onChange={(event) => setSearch(event.target.value)}
             />
             <kbd>⌘ K</kbd>
           </div>
 
-          <nav aria-label="Documentation navigation">
+          <nav aria-label={t.docsNav}>
             {filteredGroups.map((group) => (
               <div className="docs-nav-group" key={group.title}>
-                <strong>{group.title}</strong>
+                <strong>{navLabel(lang, group.title)}</strong>
                 {group.items.map(([label, href]) => (
                   <a
                     key={label}
@@ -652,51 +208,82 @@ export default function DocsPage() {
                     href={`#${href}`}
                     onClick={() => setDocsMenuOpen(false)}
                   >
-                    {label}
+                    {navLabel(lang, label)}
                   </a>
                 ))}
               </div>
             ))}
-            {filteredGroups.length === 0 && <p className="docs-search-empty">No matching pages.</p>}
+            {filteredGroups.length === 0 && <p className="docs-search-empty">{t.noMatches}</p>}
           </nav>
         </aside>
         {docsMenuOpen && (
           <button
             className="docs-sidebar-scrim"
             type="button"
-            aria-label="Close documentation navigation"
+            aria-label={t.closeDocsNav}
             onClick={() => setDocsMenuOpen(false)}
           />
         )}
 
         <article className="docs-article">
           <button className="docs-mobile-index" type="button" onClick={() => setDocsMenuOpen((current) => !current)}>
-            <span>☷</span> Browse documentation
+            <span>☷</span> {t.browse}
           </button>
 
-          <div className="docs-breadcrumb"><Link href="/docs">Docs</Link><span>›</span><b>Protocol</b></div>
+          <div className="docs-breadcrumb">
+            <Link href="/docs">{t.breadcrumbDocs}</Link>
+            <span>›</span>
+            <b>{navLabel(lang, "Protocol")}</b>
+          </div>
 
-          <section className="docs-hero" id="overview">
+          <Section className="docs-hero" id="overview">
             <div className="docs-eyebrow">TECHNICAL DOCUMENTATION</div>
-            <h1>DuBu protocol.</h1>
+            <h1>Dubu protocol.</h1>
             <p>
-              A proprietary-inventory AMM on GIWA, and an aggregator that routes across it.
+              Liquidity bootstrapping on GIWA, in three products: Dubu PropAMM, Dubu Aggregator
+              and Dubu RFQ.
             </p>
             <div className="docs-meta">
               <span>Chain {GIWA_CHAIN_ID} · GIWA Sepolia</span>
             </div>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="what-is-dubu">
-            <h2>What DuBu is</h2>
+          <Section className="docs-section" id="what-is-dubu">
+            <h2>What Dubu is</h2>
             <p>
-              DuBu is a proprietary-inventory AMM on GIWA, chain {GIWA_CHAIN_ID}. An off-chain engine
-              publishes a four-point price ladder for each of nine pairs, and <code>PropPool</code>{" "}
-              fills takers against that ladder out of reserves it owns, with no constant-product
-              curve anywhere in the pricing. In front of it sits an aggregator that prices every
-              request across three venues, the prop pool, a UniswapV2 pool and an RFQ maker, and
-              hands back calldata ready for the <code>Router</code>.
+              Dubu bootstraps liquidity on GIWA, chain {GIWA_CHAIN_ID}, through three products of
+              its own: Dubu PropAMM, Dubu Aggregator and Dubu RFQ. On a chain this young there is
+              usually nothing to route into. Seven of the nine listed pairs have no other on-chain
+              venue at all, so Dubu supplies that depth itself.
             </p>
+            <div className="docs-definition-list">
+              <div>
+                <dt>Dubu PropAMM</dt>
+                <dd>
+                  The proprietary-inventory pool, deployed as <code>PropPool</code>. An off-chain
+                  engine publishes four prices per pair, <code>minBid</code>, <code>maxBid</code>,{" "}
+                  <code>minAsk</code> and <code>maxAsk</code>, and the pool fills takers against
+                  them out of reserves it owns, with no constant-product curve anywhere in the
+                  pricing.
+                </dd>
+              </div>
+              <div>
+                <dt>Dubu Aggregator</dt>
+                <dd>
+                  Prices every request across the prop pool, a UniswapV2 pool and the RFQ maker,
+                  then returns the calldata that executes the winner, ready for the{" "}
+                  <code>Router</code>. It runs as a Cloudflare Worker.
+                </dd>
+              </div>
+              <div>
+                <dt>Dubu RFQ</dt>
+                <dd>
+                  The quote-and-settle path. The maker signs an EIP-712 order off chain and{" "}
+                  <code>PmmSettle</code> verifies it and moves both legs with{" "}
+                  <code>transferFrom</code>, custodying nothing.
+                </dd>
+              </div>
+            </div>
             <p>
               Nothing in the path takes custody. The aggregator returns <code>to</code> and{" "}
               <code>data</code> and holds no key, the minimum output is baked into that calldata, and
@@ -714,9 +301,9 @@ export default function DocsPage() {
                 </p>
               </div>
             </div>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="architecture">
+          <Section className="docs-section" id="architecture">
             <h2>Architecture</h2>
             <p>
               A quote becomes a trade in four movements. The engine is the only writer of prices, the
@@ -730,7 +317,7 @@ export default function DocsPage() {
               <li>
                 <span>1</span>
                 <div>
-                  <strong>The engine publishes a ladder</strong>
+                  <strong>The engine publishes four prices</strong>
                   <p>
                     It derives a fair value from external venues, widens it into a spread, skews it
                     against current inventory, and packs the four resulting prices and the pair id
@@ -744,7 +331,7 @@ export default function DocsPage() {
               <li>
                 <span>2</span>
                 <div>
-                  <strong>The aggregator prices the whole grid</strong>
+                  <strong>Dubu Aggregator prices the whole grid</strong>
                   <p>
                     It evaluates eleven split points, 0 through 100 percent of the input in steps of
                     10, sending the UniV2 side as one Multicall3 batch of{" "}
@@ -759,7 +346,7 @@ export default function DocsPage() {
               <li>
                 <span>3</span>
                 <div>
-                  <strong>It asks the RFQ maker to beat that</strong>
+                  <strong>It asks Dubu RFQ to beat that</strong>
                   <p>
                     The best AMM split is sent on to the maker, which answers with a signed EIP-712
                     order or declines. The aggregator separately reads the maker&apos;s balance and its
@@ -793,8 +380,8 @@ export default function DocsPage() {
               <div>
                 <strong>The prop leg is priced over HTTP, not by eth_call</strong>
                 <p>
-                  Reading the pool on chain needs pending state to see a ladder published inside the
-                  current block, and GIWA serves pending state and pending timestamp
+                  Reading the pool on chain needs pending state to see a quote word published inside
+                  the current block, and GIWA serves pending state and pending timestamp
                   inconsistently. A <code>block.timestamp</code> ahead of the state whose{" "}
                   <code>updatedAt</code> it is compared against makes <code>PropPool</code> return{" "}
                   <code>STATUS_STALE</code> and pay zero on every pair. The engine prices the same
@@ -804,14 +391,47 @@ export default function DocsPage() {
                 </p>
               </div>
             </div>
-          </section>
 
-          <section className="docs-section" id="engine">
+            <h3>We run our own GIWA node</h3>
+            <p>
+              The reason for running one is a measurement, not a preference. A public GIWA endpoint
+              answered a laptop 12 times out of 12, and failed roughly 17 percent of the same
+              requests when they came from the aggregator, because a Cloudflare Worker&apos;s egress
+              addresses are shared with the rest of Cloudflare and collide with a public RPC&apos;s
+              per-IP limits that one laptop never reaches. Moving the reads onto a node we operate
+              took quote availability from 62.5 percent to 95.2 percent.
+            </p>
+            <p>
+              The node is op-reth <code>v2.3.0-9384bc5</code>, which is what{" "}
+              <code>web3_clientVersion</code> reports, running as a full GIWA node on our own box.{" "}
+              <code>eth_syncing</code> returns false, <code>net_version</code> is 91342 and the head
+              is around block 32,143,007. It is a node, not the sequencer. GIWA runs the sequencer,
+              and nothing here claims otherwise.
+            </p>
+            <p>
+              The engine reads it at <code>http://127.0.0.1:8545</code> and{" "}
+              <code>ws://127.0.0.1:8546</code>, on the same box, so there is no network hop in the
+              read path, which is what a 200 ms cycle needs. Sends go elsewhere: transactions are
+              submitted straight to <code>https://sepolia-sequencer.giwa.io</code>, because a local
+              node started with <code>--rollup.sequencer-http</code> forwards sends and can hold one
+              without ever delivering it.
+            </p>
+            <p>
+              The aggregator runs on Cloudflare and reaches the same node through a{" "}
+              <code>cloudflared</code> tunnel, unit <code>giwa-rpc-tunnel.service</code>, with the
+              two public GIWA endpoints, <code>https://sepolia-rpc-flashblocks.giwa.io</code> and{" "}
+              <code>https://sepolia-rpc.giwa.io</code>, kept as real fallbacks rather than
+              decoration. A watchdog, <code>giwa-rpc-watch.timer</code>, checks the tunnel every
+              five minutes and alerts when it goes stale.
+            </p>
+          </Section>
+
+          <Section className="docs-section" id="engine">
             <h2>The engine</h2>
             <p>
               The market maker is a Rust service. Its cycle runs feed, fair value, spread, skew,
-              ladder, policy, transaction, every 200 ms and again on every new head, for all nine
-              pairs at once.
+              quote word, policy, transaction, every 200 ms and again on every new head, for all
+              nine pairs at once.
             </p>
             <div className="docs-definition-list">
               <div>
@@ -850,11 +470,11 @@ export default function DocsPage() {
                 </dd>
               </div>
               <div>
-                <dt>Ladder</dt>
+                <dt>Quote word</dt>
                 <dd>
                   The skewed mid gives a bid target and an ask target. Each side is solved for the
                   width that makes the <em>average</em> executed price over a full epoch land on its
-                  target, so the four points are chosen by the size the pool intends to trade rather
+                  target, so the four prices are chosen by the size the pool intends to trade rather
                   than set at fixed offsets.
                 </dd>
               </div>
@@ -911,9 +531,9 @@ export default function DocsPage() {
               test. That is what lets the aggregator treat an HTTP price from the engine as the
               venue&apos;s own arithmetic.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="contracts">
+          <Section className="docs-section" id="contracts">
             <h2>Contracts</h2>
             <p>
               Six contracts, all deployed on GIWA Sepolia and verified on Blockscout. The three
@@ -921,59 +541,31 @@ export default function DocsPage() {
               without knowing what it is, which is why replacing the pool cost a config change and no
               redeploy of the Router.
             </p>
-            <div className="docs-table-wrap">
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>Contract</th>
-                    <th>Address</th>
-                    <th>What it does</th>
-                    <th>Key entry points</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contracts.map((contract) => (
-                    <tr key={contract.name}>
-                      <td data-label="Contract">{contract.name}</td>
-                      <td data-label="Address">
-                        <a href={`${EXPLORER_ADDRESS}/${contract.address}`} target="_blank" rel="noreferrer">
-                          {contract.address}
-                        </a>
-                      </td>
-                      <td data-label="What it does">{contract.what}</td>
-                      <td data-label="Key entry points">
-                        <div className="docs-entrypoints">
-                          {contract.entries.map((entry) => <span key={entry}>{entry}</span>)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ContractsTable />
             <p>
               A route step names its venue in the low 160 bits of a <code>uint256</code>, its weight
               in bits [175:160], and carries two flags in the top two bits: one reverses the
               direction, one funds the adapter instead of the pool. The Router validates that the
               reserved bits between them are clear before it acts on any of it.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="pricing">
+          <Section className="docs-section" id="pricing">
             <h2>The pricing model</h2>
             <p>
-              A pair costs three hot storage words. One carries the ladder and the timestamp it was
-              written at, one carries capacity and the epoch it belongs to, one carries how much of
-              that epoch has been consumed. Everything a quote needs is in those three reads.
+              A pair costs three hot storage words. One carries the four prices and the timestamp
+              they were written at, one carries capacity and the epoch it belongs to, one carries
+              how much of that epoch has been consumed. Everything a quote needs is in those three
+              reads.
             </p>
 
             <CodeBlock label="PropPool, hot storage layout" code={wordLayout} />
 
-            <LadderDiagram />
+            <QuoteWordDiagram />
 
             <h3>Prices are integers</h3>
             <p>
-              Each of the four points is a <code>uint56</code> scaled by{" "}
+              Each of the four prices is a <code>uint56</code> scaled by{" "}
               <code>10^priceScaleExp</code>, a per-pair constant that absorbs the decimal difference
               between base and quote. On the bid side the pool pays{" "}
               <code>amountIn · p / 10^priceScaleExp</code> quote units for base; on the ask side it
@@ -983,12 +575,12 @@ export default function DocsPage() {
 
             <h3>The price walks as an epoch is consumed</h3>
             <p>
-              The ladder is not two fixed prices, it is two linear ramps. The marginal bid starts at{" "}
-              <code>maxBid</code> when nothing has been sold to the pool and falls linearly to{" "}
-              <code>minBid</code> as <code>bidUsed</code> reaches <code>bidCapacity</code>. The
-              marginal ask starts at <code>minAsk</code> and rises to <code>maxAsk</code>. A trade is
-              charged the integral over the stretch of ramp it consumes, which is the average of the
-              marginal price at its start and at its end.
+              The four prices are the ends of two linear ramps, not two fixed quotes. The marginal
+              bid starts at <code>maxBid</code> when nothing has been sold to the pool and falls
+              linearly to <code>minBid</code> as <code>bidUsed</code> reaches{" "}
+              <code>bidCapacity</code>. The marginal ask starts at <code>minAsk</code> and rises to{" "}
+              <code>maxAsk</code>. A trade is charged the integral over the stretch of ramp it
+              consumes, which is the average of the marginal price at its start and at its end.
             </p>
             <div className="docs-definition-list">
               <div>
@@ -1022,9 +614,10 @@ export default function DocsPage() {
               </div>
             </div>
             <p>
-              A larger trade therefore prices worse than a smaller one on the same ladder, and a
-              trade arriving after the epoch is half consumed prices worse than the same trade
-              arriving first. That is the whole of DuBu&apos;s price impact. There is no reserve ratio in
+              A larger trade therefore prices worse than a smaller one against the same four
+              prices, and a trade arriving after the epoch is half consumed prices worse than the
+              same trade arriving first. That is the whole of Dubu PropAMM&apos;s price impact. There
+              is no reserve ratio in
               it, so impact is set by the depth the maker chose to publish rather than by how much
               inventory happens to be sitting in the contract.
             </p>
@@ -1033,28 +626,30 @@ export default function DocsPage() {
               price at current usage, which is what a taker arriving now would get on the first unit.
               The engine measures drift against those, not against the stored endpoints.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="capacity">
+          <Section className="docs-section" id="capacity">
             <h2>Capacity and capacity epochs</h2>
             <p>
-              Capacity is how much base the pool will trade on one side before the ladder is
-              exhausted, and it is also the denominator of the walk. It is refreshed by the engine,
-              not replenished by trading.
+              Capacity is how much base the pool will trade on one side before that side&apos;s ramp
+              is exhausted, and it is also the denominator of the walk. It is refreshed by the
+              engine, not replenished by trading.
             </p>
             <p>
               An epoch is a generation counter. <code>refreshCapacity</code> writes new bid and ask
               capacities and increments a 32-bit <code>capGen</code>. The used word carries its own{" "}
               <code>usedGen</code>, and when the two disagree <code>bidUsed</code> and{" "}
-              <code>askUsed</code> read as zero. A refresh therefore resets the walk to the top of
-              the ladder in a single write, without touching the used word at all.
+              <code>askUsed</code> read as zero. A refresh therefore resets the bid to{" "}
+              <code>maxBid</code> and the ask to <code>minAsk</code> in a single write, without
+              touching the used word at all.
             </p>
             <p>
               Capacity also decays with quote age. If a pair has a non-zero <code>decaySecs</code>,
               the size the pool will fill is <code>capacity · (decaySecs − age) / decaySecs</code>,
               reaching zero at <code>age ≥ decaySecs</code>, where <code>age</code> is measured from
-              the ladder&apos;s own <code>updatedAt</code>. This is a dead-man switch: an engine that
-              stops publishing walks its own book down to nothing with nobody intervening.
+              the quote word&apos;s own <code>updatedAt</code>. This is a dead-man switch: an
+              engine that stops publishing walks its own book down to nothing with nobody
+              intervening.
             </p>
             <p>
               Decay caps size, not price. The curve is still evaluated against the full stored{" "}
@@ -1072,9 +667,9 @@ export default function DocsPage() {
               <code>effectiveCapacity(pairId)</code> returns the post-decay numbers, which is what
               the pool will actually fill right now.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="guards">
+          <Section className="docs-section" id="guards">
             <h2>Guards and roles</h2>
             <p>
               A pushed price is a trusted price, so the pool bounds what it will accept and splits
@@ -1085,7 +680,7 @@ export default function DocsPage() {
                 <dt>Reference bound</dt>
                 <dd>
                   When a pair has a Pyth feed configured, <code>updateQuote</code> checks the new
-                  ladder against it and reverts <code>BidCeilingExceeded</code> if{" "}
+                  prices against it and reverts <code>BidCeilingExceeded</code> if{" "}
                   <code>maxBid</code> sits more than <code>maxDeviationBps</code> above the
                   reference, or <code>AskFloorBreached</code> if <code>minAsk</code> sits that far
                   below it. A feed that is unavailable, stale or non-positive reverts{" "}
@@ -1095,7 +690,7 @@ export default function DocsPage() {
                 </dd>
               </div>
               <div>
-                <dt>Ladder validity</dt>
+                <dt>Quote word validity</dt>
                 <dd>
                   <code>minBid &lt; minPrice</code> reverts <code>BidBelowMinPrice</code>. Anything
                   that breaks <code>minBid ≤ maxBid ≤ minAsk ≤ maxAsk</code>, or that lets{" "}
@@ -1146,12 +741,12 @@ export default function DocsPage() {
               deployment all four roles are the deployer, which is the one thing here that would be
               wrong on mainnet.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="quote-endpoint">
+          <Section className="docs-section" id="quote-endpoint">
             <div className="docs-section-heading">
               <div>
-                <span>AGGREGATOR API</span>
+                <span>DUBU AGGREGATOR</span>
                 <h2>POST /quote</h2>
               </div>
             </div>
@@ -1216,12 +811,12 @@ export default function DocsPage() {
               the quote was taken unverified on that axis, which is a different claim from verified
               and fine.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="markets-endpoint">
+          <Section className="docs-section" id="markets-endpoint">
             <div className="docs-section-heading">
               <div>
-                <span>AGGREGATOR API</span>
+                <span>DUBU AGGREGATOR</span>
                 <h2>GET /markets</h2>
               </div>
             </div>
@@ -1238,9 +833,9 @@ export default function DocsPage() {
             </p>
             <CodeBlock label="Request" code={marketsRequest} />
             <CodeBlock label="200, abridged" code={marketsResponse} />
-          </section>
+          </Section>
 
-          <section className="docs-section" id="errors">
+          <Section className="docs-section" id="errors">
             <h2>Error responses</h2>
             <p>
               Two failures look identical to a user and are not the same fact, so they answer with
@@ -1263,9 +858,9 @@ export default function DocsPage() {
               <div>
                 <dt>404</dt>
                 <dd>
-                  Every venue returned zero: spent epoch capacity, a stale ladder, a paused pair, or
-                  an engine that could not be reached. A pause can be a latched killswitch, so this
-                  is not known to clear without an operator.
+                  Every venue returned zero: spent epoch capacity, a stale quote word, a paused
+                  pair, or an engine that could not be reached. A pause can be a latched killswitch,
+                  so this is not known to clear without an operator.
                 </dd>
               </div>
               <div>
@@ -1288,9 +883,9 @@ export default function DocsPage() {
                 </dd>
               </div>
             </div>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="markets">
+          <Section className="docs-section" id="markets">
             <h2>Markets</h2>
             <p>
               Nine pairs, every one quoted against mUSDC (6 decimals,{" "}
@@ -1298,39 +893,7 @@ export default function DocsPage() {
               Base decimals are not uniform, and a wrong one misprices by orders of magnitude without
               failing anything.
             </p>
-            <div className="docs-table-wrap">
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>pairId</th>
-                    <th>Symbol</th>
-                    <th>Base address</th>
-                    <th>Decimals</th>
-                    <th>Tracks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {MARKETS.map((market) => {
-                    const token = TOKENS[market.base];
-                    return (
-                      <tr key={market.base}>
-                        <td data-label="pairId">{market.pairId}</td>
-                        <td data-label="Symbol">{market.base}/{market.quote}</td>
-                        <td data-label="Base address">
-                          {token.address && (
-                            <a href={`${EXPLORER_ADDRESS}/${token.address}`} target="_blank" rel="noreferrer">
-                              {token.address}
-                            </a>
-                          )}
-                        </td>
-                        <td data-label="Decimals">{token.decimals}</td>
-                        <td data-label="Tracks">{token.tracks}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <MarketsTable />
             <p>
               Two of the nine also have a UniswapV2 pool, mWETH/mUSDC and mWBTC/mUSDC, and those are
               the only pairs where a split route is possible. On the other seven a UniV2 leg prices
@@ -1338,9 +901,9 @@ export default function DocsPage() {
               and the all-prop point wins on its own. That is the same path a UniV2 outage takes on a
               pair that does have a pool.
             </p>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="integrating">
+          <Section className="docs-section" id="integrating">
             <h2>Integrating</h2>
             <p>
               Two calls and one signature. Quote, make sure the Router can move the input, then send
@@ -1352,16 +915,17 @@ export default function DocsPage() {
               <div>
                 <strong>Re-quote before signing</strong>
                 <p>
-                  The pool re-quotes several times a second and RFQ orders are signed with a short
-                  expiry, so a quote a few seconds old can revert rather than merely mis-price. Fetch
+                  The pool re-prices on the 200 ms cycle described above and RFQ orders are signed
+                  with a short expiry, so a quote a few seconds old can revert rather than merely
+                  mis-price. Fetch
                   a fresh one at click time and refuse it if it comes back worse than the minimum you
                   already showed.
                 </p>
               </div>
             </div>
-          </section>
+          </Section>
 
-          <section className="docs-section" id="permit2">
+          <Section className="docs-section" id="permit2">
             <h2>Permit2</h2>
             <p>
               The Router accepts both entry points. <code>swapExactIn</code> needs a standing ERC-20
@@ -1380,21 +944,23 @@ export default function DocsPage() {
               carried across as decoded rather than recomputed.
             </p>
             <CodeBlock label="Quote and execute, Permit2 path" code={permit2Path} />
-          </section>
+          </Section>
 
-          <section className="docs-section" id="next-steps">
+          <Section className="docs-section" id="next-steps">
             <h2>Next steps</h2>
             <div className="docs-next-grid">
               <Link href="/swap"><span>⇄</span><div><strong>Make a swap</strong><p>Open the trading interface.</p></div><b>→</b></Link>
               <Link href="/trade"><span>⌁</span><div><strong>Open advanced trade</strong><p>Charts, limit orders and live pool state.</p></div><b>→</b></Link>
             </div>
-          </section>
+          </Section>
         </article>
 
         <aside className="docs-toc">
-          <strong>On this page</strong>
+          <strong>{t.onThisPage}</strong>
           <nav>
-            {toc.map(([label, href]) => <a key={href} href={`#${href}`}>{label}</a>)}
+            {toc.map(([label, href]) => (
+              <a key={href} href={`#${href}`}>{navLabel(lang, label)}</a>
+            ))}
           </nav>
         </aside>
       </div>

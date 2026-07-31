@@ -47,7 +47,9 @@
   height: 96px;
   padding: 0 clamp(28px, 5vw, 76px);
   display: grid;
-  grid-template-columns: 190px 1fr 280px;
+  /* The actions track is auto, not a fixed 280px: the language toggle pushed the row past 280 and
+     a flex-end overflow spills left into the nav. auto also never needs re-tuning again. */
+  grid-template-columns: 190px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--docs-line);
   background: color-mix(in srgb, var(--docs-paper) 82%, transparent);
@@ -110,6 +112,40 @@
   color: var(--docs-ink);
   background: var(--docs-surface);
   cursor: pointer;
+}
+
+.docs-lang-toggle {
+  height: 44px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--docs-line);
+  border-radius: 12px;
+  background: var(--docs-surface);
+}
+
+.docs-lang-toggle button {
+  height: 36px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--docs-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.docs-lang-toggle button:hover {
+  color: var(--docs-ink);
+}
+
+.docs-lang-toggle button[aria-pressed="true"] {
+  color: var(--docs-ink);
+  background: var(--docs-soft);
 }
 
 .docs-launch-button {
@@ -365,6 +401,23 @@
 .docs-section {
   padding: 52px 0 7px;
   scroll-margin-top: 120px;
+}
+
+/* Korean breaks at word boundaries, not at arbitrary characters. Without keep-all a long Korean
+   paragraph splits mid-word. The English reset is for the identifiers inside a Korean section,
+   which carry lang="en" and should keep breaking the way they always did. */
+.docs-site [lang="ko"] {
+  word-break: keep-all;
+}
+
+/* `code` and `pre` are excluded deliberately, and it is not cosmetic. `.docs-site [lang="en"]` is
+   (0,2,0) and `.docs-site code` is (0,1,1), so without the :not() this reset out-specifies the
+   inline-code rule and cancels its `word-break: break-word` on every <C> in a Korean paragraph.
+   A 42-character address inline in Korean prose then has no break opportunity at all and pushes
+   the document past the viewport at 375px. The other English islands, the <th>s, the endpoint
+   headings, the .docs-http row, are not code and still want `normal`. */
+.docs-site [lang="en"]:not(code):not(pre) {
+  word-break: normal;
 }
 
 .docs-section h2 {
@@ -932,7 +985,7 @@
 
 @media (max-width: 1120px) {
   .docs-header {
-    grid-template-columns: 160px 1fr 240px;
+    grid-template-columns: 160px 1fr auto;
   }
 
   .docs-layout {
@@ -1080,6 +1133,17 @@
 
   .docs-header-actions {
     gap: 8px;
+  }
+
+  .docs-lang-toggle {
+    height: 40px;
+    padding: 2px;
+  }
+
+  .docs-lang-toggle button {
+    height: 36px;
+    padding: 0 8px;
+    font-size: 10px;
   }
 
   .docs-announcement {

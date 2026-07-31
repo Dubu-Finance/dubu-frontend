@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "DuBu protocol documentation",
+  title: "Dubu protocol documentation",
   description:
-    "The prop AMM, its pricing curve, the aggregator API, and the contracts on GIWA Sepolia.",
+    "Dubu bootstraps liquidity on GIWA with three products: Dubu PropAMM, Dubu Aggregator and Dubu RFQ. Contracts, pricing, API.",
 };
 
 export default function DocsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
