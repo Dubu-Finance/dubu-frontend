@@ -158,10 +158,10 @@ export function ArchitectureDiagram({ caption }: { caption?: ReactNode }) {
   return (
     <figure className="docs-figure">
       <svg
-        viewBox="0 0 860 430"
+        viewBox="0 0 860 600"
         role="img"
         lang="en"
-        aria-label="The engine pushes the four prices to PropPool and prices the prop leg for the aggregator; the aggregator returns calldata; the wallet signs it to the Router, which executes against PropPool, the UniswapV2 pair and PmmSettle."
+        aria-label="What a swap looks like from the user's side. You choose a pair and an amount; the Dubu Aggregator prices it against Dubu PropAMM, a UniswapV2 pair and Dubu RFQ and returns calldata; you sign it; the Router splits the trade and enforces the minimum; the tokens arrive in your wallet."
       >
         <defs>
           <marker id="docs-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
@@ -169,85 +169,92 @@ export function ArchitectureDiagram({ caption }: { caption?: ReactNode }) {
           </marker>
         </defs>
 
-        <g className="docs-svg-line" strokeDasharray="4 5">
-          <path d="M10 150 H 850" />
-        </g>
-        <text className="docs-svg-tag" x="762" y="144">OFF CHAIN</text>
-        <text className="docs-svg-tag" x="774" y="166">ON CHAIN</text>
-
+        {/* The journey, top to bottom. */}
         <g className="docs-svg-line" markerEnd="url(#docs-arrow)">
-          <path d="M200 70 H 314" />
-          <path d="M520 70 H 644" />
-          <path d="M745 106 V 164" />
-          <path d="M70 106 V 314" />
-          <path d="M700 234 V 274 H 150 V 314" />
-          <path d="M700 274 H 400 V 314" />
-          <path d="M700 274 H 630 V 314" />
+          <path d="M200 86 V 120" />
+          <path d="M200 212 V 246" />
+          <path d="M200 338 V 372" />
+          <path d="M200 464 V 498" />
+        </g>
+
+        {/* The aggregator asks the three venues. Drawn as a rail so no line crosses a box. */}
+        <g className="docs-svg-line">
+          <path d="M360 168 H 420" />
+          <path d="M420 146 V 282" />
+        </g>
+        <g className="docs-svg-line" markerEnd="url(#docs-arrow)">
+          <path d="M420 146 H 456" />
+          <path d="M420 214 H 456" />
+          <path d="M420 282 H 456" />
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="20" y="34" width="180" height="72" rx="12" />
-          <text className="docs-svg-label" x="36" y="62">Engine</text>
-          <text className="docs-svg-sub" x="36" y="80">Rust market maker</text>
-          <text className="docs-svg-sub" x="36" y="95">feed to four prices, 200 ms</text>
+          <rect className="docs-svg-panel" x="40" y="20" width="320" height="66" rx="12" />
+          <text className="docs-svg-label" x="60" y="48">You</text>
+          <text className="docs-svg-sub" x="60" y="70">choose a pair and an amount</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="320" y="34" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="336" y="62">Dubu Aggregator</text>
-          <text className="docs-svg-sub" x="336" y="80">Cloudflare Worker</text>
-          <text className="docs-svg-sub" x="336" y="95">11-point split search</text>
+          <rect className="docs-svg-panel" x="40" y="124" width="320" height="88" rx="12" />
+          <text className="docs-svg-label" x="60" y="152">Dubu Aggregator</text>
+          <text className="docs-svg-sub" x="60" y="174">off chain, a Cloudflare Worker</text>
+          <text className="docs-svg-sub" x="60" y="192">searches eleven ways to split the trade</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="644" y="34" width="192" height="72" rx="12" />
-          <text className="docs-svg-label" x="660" y="62">Wallet</text>
-          <text className="docs-svg-sub" x="660" y="80">signs to + data</text>
-          <text className="docs-svg-sub" x="660" y="95">no custody anywhere</text>
+          <rect className="docs-svg-panel" x="40" y="250" width="320" height="88" rx="12" />
+          <text className="docs-svg-label" x="60" y="278">You sign</text>
+          <text className="docs-svg-sub" x="60" y="300">your wallet, your key</text>
+          <text className="docs-svg-sub" x="60" y="318">the minimum is already inside the calldata</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="644" y="164" width="192" height="70" rx="12" />
-          <text className="docs-svg-label" x="660" y="192">Router</text>
-          <text className="docs-svg-sub" x="660" y="210">divides by weightBps</text>
-          <text className="docs-svg-sub" x="660" y="225">enforces minAmountOut</text>
+          <rect className="docs-svg-panel" x="40" y="376" width="320" height="88" rx="12" />
+          <text className="docs-svg-label" x="60" y="404">Router</text>
+          <text className="docs-svg-sub" x="60" y="426">on chain</text>
+          <text className="docs-svg-sub" x="60" y="444">splits by weightBps, enforces minAmountOut</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="20" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="36" y="342">PropPool</text>
-          <text className="docs-svg-sub" x="36" y="360">own inventory</text>
-          <text className="docs-svg-sub" x="36" y="375">four prices per pair</text>
+          <rect className="docs-svg-panel" x="40" y="502" width="320" height="60" rx="12" />
+          <text className="docs-svg-label" x="60" y="530">Your wallet</text>
+          <text className="docs-svg-sub" x="60" y="551">tokens arrive, or nothing happens at all</text>
+        </g>
+
+        <text className="docs-svg-sub" x="456" y="106">priced against all three, at your size</text>
+
+        <g>
+          <rect className="docs-svg-panel" x="456" y="118" width="364" height="56" rx="12" />
+          <text className="docs-svg-label" x="474" y="142">Dubu PropAMM</text>
+          <text className="docs-svg-sub" x="474" y="162">our own inventory, four prices per pair</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="300" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="316" y="342">UniswapV2 pair</text>
-          <text className="docs-svg-sub" x="316" y="360">constant product</text>
-          <text className="docs-svg-sub" x="316" y="375">two pairs of the nine</text>
+          <rect className="docs-svg-panel" x="456" y="186" width="364" height="56" rx="12" />
+          <text className="docs-svg-label" x="474" y="210">UniswapV2 pair</text>
+          <text className="docs-svg-sub" x="474" y="230">constant product, two of the nine pairs</text>
         </g>
 
         <g>
-          <rect className="docs-svg-panel" x="560" y="314" width="200" height="72" rx="12" />
-          <text className="docs-svg-label" x="576" y="342">PmmSettle</text>
-          <text className="docs-svg-sub" x="576" y="360">signed RFQ order</text>
-          <text className="docs-svg-sub" x="576" y="375">maker inventory</text>
+          <rect className="docs-svg-panel" x="456" y="254" width="364" height="56" rx="12" />
+          <text className="docs-svg-label" x="474" y="278">Dubu RFQ</text>
+          <text className="docs-svg-sub" x="474" y="298">a maker order, signed off chain</text>
         </g>
 
-        <text className="docs-svg-sub" x="206" y="60">prop prices</text>
-        <text className="docs-svg-sub" x="526" y="60">to + data</text>
-        <text className="docs-svg-sub" x="752" y="142">signed tx</text>
-        <text className="docs-svg-sub" x="80" y="200">updateQuote</text>
-        <text className="docs-svg-sub" x="80" y="216">refreshCapacity</text>
-        <text className="docs-svg-sub" x="404" y="268">sellBase / sellQuote</text>
+        <text className="docs-svg-sub" x="456" y="332">the best split wins, and it can be a mix</text>
+
+        <text className="docs-svg-sub" x="212" y="110">POST /quote</text>
+        <text className="docs-svg-sub" x="212" y="236">to, data and minAmountOut come back</text>
+        <text className="docs-svg-sub" x="212" y="362">your wallet sends it</text>
+        <text className="docs-svg-sub" x="212" y="488">one transaction, whatever the split</text>
       </svg>
       <figcaption>
         {caption ?? (
           <>
-            The engine is the only writer of prices, the aggregator is the only component that
-            compares venues, and the Router is the only one that moves funds. The aggregator reads
-            the UniswapV2 pair on chain through Multicall3 and takes the prop price from the engine
-            over HTTP, for the reason given below.
+            You talk to one endpoint. Behind it the aggregator is the only component that compares
+            venues, and the Router is the only one that moves funds. Nothing in the path takes
+            custody: the aggregator returns <code>to</code> and <code>data</code> and holds no key,
+            and the minimum you were shown is enforced on chain rather than trusted.
           </>
         )}
       </figcaption>
