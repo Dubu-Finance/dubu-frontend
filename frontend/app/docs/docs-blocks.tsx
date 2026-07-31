@@ -232,7 +232,7 @@ export function ArchitectureDiagram({ caption }: { caption?: ReactNode }) {
         <g>
           <rect className="docs-svg-panel" x="456" y="186" width="364" height="56" rx="12" />
           <text className="docs-svg-label" x="474" y="210">UniswapV2 pair</text>
-          <text className="docs-svg-sub" x="474" y="230">constant product, two of the nine pairs</text>
+          <text className="docs-svg-sub" x="474" y="230">constant product, one pool per market</text>
         </g>
 
         <g>
