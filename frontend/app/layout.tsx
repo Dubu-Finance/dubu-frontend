@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase: base,
-    title: "Dubu — Best Price. Every Time.",
+    title: "Dubu, Best Price. Every Time.",
     description:
       "A proprietary AMM for clear, non-custodial swaps on GIWA Chain.",
     icons: {
@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
       shortcut: "/assets/character.png",
     },
     openGraph: {
-      title: "Dubu — Best Price. Every Time.",
+      title: "Dubu, Best Price. Every Time.",
       description: "Clear pricing, low friction, and full wallet control on GIWA Chain.",
       type: "website",
       images: [
@@ -32,13 +32,13 @@ export async function generateMetadata(): Promise<Metadata> {
           url: "/og.png",
           width: 1536,
           height: 864,
-          alt: "Dubu — Best Price. Every Time.",
+          alt: "Dubu, Best Price. Every Time.",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Dubu — Best Price. Every Time.",
+      title: "Dubu, Best Price. Every Time.",
       description: "Clear pricing, low friction, and full wallet control on GIWA Chain.",
       images: ["/og.png"],
     },
